@@ -1,10 +1,54 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
-import { LogIn } from 'lucide-react';
+import { LogIn, ShieldAlert, Key, Settings } from 'lucide-react';
+
+export function SetupRequired() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow-lg border border-red-100">
+        <div className="text-center">
+          <div className="mx-auto h-16 w-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+            <ShieldAlert className="h-8 w-8 text-red-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900">
+            Configuração Necessária
+          </h2>
+          <p className="mt-2 text-sm text-gray-600">
+            Para proteger suas chaves, movi a configuração para variáveis de ambiente.
+          </p>
+        </div>
+
+        <div className="mt-8 space-y-4">
+          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+            <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <Key size={16} className="text-indigo-600" />
+              Como configurar:
+            </h3>
+            <ol className="mt-3 text-xs text-gray-600 space-y-2 list-decimal list-inside">
+              <li>Abra o menu <strong>Settings</strong> (engrenagem)</li>
+              <li>Vá em <strong>Secrets</strong> ou <strong>Environment Variables</strong></li>
+              <li>Adicione <strong>VITE_FIREBASE_API_KEY</strong> e as outras chaves listadas no arquivo <code>.env.example</code></li>
+              <li>Reinicie o servidor de desenvolvimento</li>
+            </ol>
+          </div>
+          
+          <div className="flex items-center gap-2 text-xs text-indigo-600 bg-indigo-50 p-3 rounded-lg">
+            <Settings size={14} />
+            <span>Isso garante que suas chaves não sejam expostas se você exportar para o GitHub.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function Login() {
-  const { user, login } = useAuth();
+  const { user, login, isConfigured } = useAuth();
+
+  if (!isConfigured) {
+    return <SetupRequired />;
+  }
 
   if (user) {
     return <Navigate to="/" />;
