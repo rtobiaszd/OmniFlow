@@ -62,6 +62,33 @@ const WORKFLOW_TEMPLATES = [
       { id: '4', type: 'action' as const, data: { label: 'Lembrete Final' }, position: { x: 250, y: 300 } }
     ],
     edges: [{ id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3' }, { id: 'e3-4', source: '3', target: '4' }]
+  },
+  {
+    id: 'template-realestate',
+    name: 'Imobiliária: Qualificação de Lead',
+    description: 'Usa IA para qualificar leads que entram via formulário ou WhatsApp.',
+    niche: 'Imobiliária',
+    nodes: [
+      { id: '1', type: 'trigger' as const, data: { label: 'Novo Lead' }, position: { x: 250, y: 0 } },
+      { id: '2', type: 'ai' as const, data: { label: 'Qualificar Perfil', prompt: 'Analise o interesse do lead e classifique em: Quente, Morno ou Frio.' }, position: { x: 250, y: 100 } },
+      { id: '3', type: 'condition' as const, data: { label: 'Lead Quente?' }, position: { x: 250, y: 200 } },
+      { id: '4', type: 'action' as const, data: { label: 'Notificar Corretor VIP' }, position: { x: 100, y: 300 } },
+      { id: '5', type: 'action' as const, data: { label: 'Enviar Email Nutrição' }, position: { x: 400, y: 300 } }
+    ],
+    edges: [{ id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3' }, { id: 'e3-4', source: '3', target: '4' }, { id: 'e3-5', source: '3', target: '5' }]
+  },
+  {
+    id: 'template-ecommerce',
+    name: 'E-commerce: Carrinho Abandonado',
+    description: 'Recupera vendas enviando cupons de desconto após 2 horas.',
+    niche: 'E-commerce',
+    nodes: [
+      { id: '1', type: 'trigger' as const, data: { label: 'Carrinho Abandonado' }, position: { x: 250, y: 0 } },
+      { id: '2', type: 'delay' as const, data: { label: 'Aguardar 2h', delay: 120 }, position: { x: 250, y: 100 } },
+      { id: '3', type: 'ai' as const, data: { label: 'Gerar Cupom Personalizado' }, position: { x: 250, y: 200 } },
+      { id: '4', type: 'action' as const, data: { label: 'Enviar WhatsApp Recuperação' }, position: { x: 250, y: 300 } }
+    ],
+    edges: [{ id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3' }, { id: 'e3-4', source: '3', target: '4' }]
   }
 ];
 

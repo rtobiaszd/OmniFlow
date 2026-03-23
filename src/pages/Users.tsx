@@ -58,6 +58,7 @@ export function Users() {
         email: inviteData.email,
         role: inviteData.role,
         photoURL: `https://ui-avatars.com/api/?name=${inviteData.displayName}`,
+        status: 'pending',
         createdAt: new Date().toISOString()
       });
       setIsInviting(false);
@@ -237,8 +238,12 @@ export function Users() {
                       </select>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        Ativo
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        user.status === 'pending' 
+                          ? 'bg-yellow-100 text-yellow-800' 
+                          : 'bg-green-100 text-green-800'
+                      }`}>
+                        {user.status === 'pending' ? 'Pendente' : 'Ativo'}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">

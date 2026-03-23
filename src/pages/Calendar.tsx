@@ -66,28 +66,28 @@ export function Calendar() {
         </div>
         <div className="flex gap-3">
           <button 
-            onClick={() => handleConnect('google')}
+            onClick={() => handleConnect('google_calendar')}
             className={cn(
               "flex items-center space-x-2 px-4 py-2 rounded-xl border transition-all text-sm font-bold",
-              integrations.google 
+              isGoogleConnected 
                 ? "bg-green-50 border-green-200 text-green-700" 
                 : "bg-white border-gray-200 text-gray-600 hover:border-indigo-600 hover:text-indigo-600"
             )}
           >
             <Globe size={18} />
-            <span>{integrations.google ? 'Google Connected' : 'Connect Google'}</span>
+            <span>{isGoogleConnected ? 'Google Connected' : 'Connect Google'}</span>
           </button>
           <button 
-            onClick={() => handleConnect('microsoft')}
+            onClick={() => handleConnect('outlook_calendar')}
             className={cn(
               "flex items-center space-x-2 px-4 py-2 rounded-xl border transition-all text-sm font-bold",
-              integrations.microsoft 
+              isOutlookConnected 
                 ? "bg-blue-50 border-blue-200 text-blue-700" 
                 : "bg-white border-gray-200 text-gray-600 hover:border-indigo-600 hover:text-indigo-600"
             )}
           >
             <Mail size={18} />
-            <span>{integrations.microsoft ? 'Outlook Connected' : 'Connect Outlook'}</span>
+            <span>{isOutlookConnected ? 'Outlook Connected' : 'Connect Outlook'}</span>
           </button>
           <button className="flex items-center space-x-2 bg-indigo-600 text-white px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors shadow-sm ml-4">
             <Plus size={20} />
@@ -185,10 +185,10 @@ export function Calendar() {
                 Conecte seu Google Calendar para sincronizar automaticamente seus agendamentos.
               </p>
               <button 
-                onClick={() => handleConnect('google')}
+                onClick={() => handleConnect('google_calendar')}
                 className="mt-4 bg-white text-indigo-600 px-4 py-2 rounded-xl text-sm font-bold hover:bg-indigo-50 transition-colors"
               >
-                {integrations.google ? 'Sincronizado' : 'Conectar Agora'}
+                {isGoogleConnected ? 'Sincronizado' : 'Conectar Agora'}
               </button>
             </div>
             <CalendarIcon className="absolute -bottom-4 -right-4 h-24 w-24 text-indigo-500 opacity-20" />
@@ -197,8 +197,4 @@ export function Calendar() {
       </div>
     </div>
   );
-}
-
-function cn(...classes: any[]) {
-  return classes.filter(Boolean).join(' ');
 }

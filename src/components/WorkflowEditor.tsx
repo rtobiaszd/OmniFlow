@@ -341,6 +341,21 @@ export function WorkflowEditor({ workflow, onClose }: WorkflowEditorProps) {
                   </div>
                 )}
 
+                {/* Condition Configuration */}
+                {(selectedNode.data.originalNode as WorkflowNode).type === 'condition' && (
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Condition Expression</label>
+                    <input 
+                      type="text"
+                      value={(selectedNode.data.originalNode as WorkflowNode).data.condition || ''}
+                      onChange={(e) => updateNodeData(selectedNode.id, { condition: e.target.value })}
+                      placeholder="e.g. status === 'active'"
+                      className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                    />
+                    <p className="text-[10px] text-gray-400 mt-2">Use JavaScript expressions to evaluate the condition.</p>
+                  </div>
+                )}
+
                 <div className="pt-6 border-t border-gray-100">
                   <button 
                     onClick={() => deleteNode(selectedNode.id)}

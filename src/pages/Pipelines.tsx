@@ -619,7 +619,7 @@ export function Pipelines() {
               
               <div className="space-y-6">
                 <div className="space-y-3">
-                  {activePipeline?.customFields.map(f => (
+                  {activePipeline?.customFields?.map(f => (
                     <div key={f.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
                       <div>
                         <div className="font-bold text-gray-900 text-sm">{f.name}</div>
