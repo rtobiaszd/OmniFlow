@@ -56,6 +56,11 @@ export const pipelineService = {
     await updateDoc(docRef, pipeline);
   },
 
+  async deletePipeline(id: string) {
+    if (!db) return;
+    await deleteDoc(doc(db, PIPELINES_COLLECTION, id));
+  },
+
   // Deal operations
   subscribeToDeals(tenantId: string, callback: (deals: Deal[]) => void) {
     if (!db) return () => {};
@@ -78,5 +83,11 @@ export const pipelineService = {
     };
     await setDoc(doc(db, DEALS_COLLECTION, id), newDeal);
     return newDeal;
+  },
+
+  async updateDeal(deal: Partial<Deal> & { id: string }) {
+    if (!db) return;
+    const docRef = doc(db, DEALS_COLLECTION, deal.id);
+    await updateDoc(docRef, deal);
   }
 };

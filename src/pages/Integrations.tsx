@@ -9,7 +9,8 @@ import {
   Loader2,
   Settings,
   X,
-  Trash2
+  Trash2,
+  Zap
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -26,6 +27,10 @@ const AVAILABLE_INTEGRATIONS = [
   { id: 'jira', name: 'Jira Software', provider: 'Atlassian', icon: 'J', color: 'bg-blue-600', description: 'Sync tickets with Jira projects.' },
   { id: 'github', name: 'GitHub', provider: 'GitHub', icon: 'G', color: 'bg-gray-900', description: 'Track issues and PRs in your CRM.' },
   { id: 'slack', name: 'Slack', provider: 'Salesforce', icon: 'S', color: 'bg-purple-600', description: 'Get real-time notifications in Slack.' },
+  { id: 'webhook', name: 'Webhook', provider: 'Generic', icon: 'W', color: 'bg-orange-600', description: 'Receive events from any service via webhooks.' },
+  { id: 'api', name: 'Custom API', provider: 'Generic', icon: 'A', color: 'bg-indigo-600', description: 'Connect to any REST API with custom auth.' },
+  { id: 'google_calendar', name: 'Google Calendar', provider: 'Google', icon: 'G', color: 'bg-blue-500', description: 'Sync your appointments with Google.' },
+  { id: 'outlook_calendar', name: 'Outlook Calendar', provider: 'Microsoft', icon: 'O', color: 'bg-blue-600', description: 'Sync your appointments with Outlook.' },
 ];
 
 export function Integrations() {
@@ -116,6 +121,21 @@ export function Integrations() {
       case 'slack':
         fields.webhookUrl = { label: 'Webhook URL', type: 'text', placeholder: 'https://hooks.slack.com/services/...' };
         break;
+      case 'webhook':
+        fields.url = { label: 'Webhook URL', type: 'text', placeholder: 'https://your-app.com/api/webhook' };
+        fields.secret = { label: 'Webhook Secret (Optional)', type: 'password', placeholder: 'For signature verification' };
+        break;
+      case 'api':
+        fields.baseUrl = { label: 'Base URL', type: 'text', placeholder: 'https://api.example.com/v1' };
+        fields.authType = { label: 'Auth Type (Bearer/Basic/None)', type: 'text', placeholder: 'Bearer' };
+        fields.token = { label: 'Auth Token / Key', type: 'password', placeholder: 'Your API Key' };
+        fields.headerName = { label: 'Auth Header Name', type: 'text', placeholder: 'Authorization' };
+        break;
+      case 'google_calendar':
+      case 'outlook_calendar':
+        fields.clientId = { label: 'Client ID', type: 'text', placeholder: 'OAuth Client ID' };
+        fields.clientSecret = { label: 'Client Secret', type: 'password', placeholder: 'OAuth Client Secret' };
+        break;
     }
 
     return Object.entries(fields).map(([key, config]) => (
@@ -154,6 +174,40 @@ export function Integrations() {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500"
           />
+        </div>
+      </div>
+
+      {/* Webhook Info Card */}
+      <div className="bg-[#151619] text-white p-8 rounded-[32px] shadow-xl relative overflow-hidden mb-8">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="max-w-xl">
+            <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
+              <Zap size={20} className="text-amber-400" />
+              Incoming Webhooks
+            </h3>
+            <p className="text-gray-400 text-sm leading-relaxed">
+              Use this unique endpoint to send external events to your workflows. 
+              Send a POST request with a JSON body to trigger your automations.
+            </p>
+          </div>
+          
+          <div className="flex-1 max-w-md">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-2">Your Webhook URL</label>
+            <div className="flex gap-2">
+              <code className="flex-1 bg-white/5 p-3 rounded-xl text-[10px] font-mono break-all border border-white/10 text-indigo-300">
+                {window.location.origin}/api/webhooks/{profile?.tenantId}
+              </code>
+              <button 
+                onClick={() => {
+                  navigator.clipboard.writeText(`${window.location.origin}/api/webhooks/${profile?.tenantId}`);
+                  alert('URL copied to clipboard!');
+                }}
+                className="p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-all"
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../lib/firebase';
-import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
 import { UserProfile } from '../services/userService';
-import { motion } from 'motion/react';
-import { UserPlus, Mail, Shield, Trash2, Search, Loader2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { UserPlus, Mail, Shield, Trash2, Search, Loader2, X } from 'lucide-react';
 
 export function Users() {
   const { profile } = useAuth();
@@ -40,9 +40,47 @@ export function Users() {
     }
   };
 
+  const [isInviting, setIsInviting] = useState(false);
+  const [inviteData, setInviteData] = useState({ displayName: '', email: '', role: 'agent' as const });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile?.tenantId || !db) return;
+
+    setIsSubmitting(true);
+    try {
+      const newUserRef = doc(collection(db, 'users'));
+      await setDoc(newUserRef, {
+        uid: newUserRef.id,
+        tenantId: profile.tenantId,
+        displayName: inviteData.displayName,
+        email: inviteData.email,
+        role: inviteData.role,
+        photoURL: `https://ui-avatars.com/api/?name=${inviteData.displayName}`,
+        createdAt: new Date().toISOString()
+      });
+      setIsInviting(false);
+      setInviteData({ displayName: '', email: '', role: 'agent' });
+    } catch (error) {
+      console.error('Error inviting user:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteUser = async (uid: string) => {
+    if (!db || !confirm('Tem certeza que deseja remover este usuário?')) return;
+    try {
+      await deleteDoc(doc(db, 'users', uid));
+    } catch (error) {
+      console.error('Error deleting user:', error);
+    }
+  };
+
   const filteredUsers = users.filter(user => 
-    user.displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase())
+    user.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -52,11 +90,77 @@ export function Users() {
           <h1 className="text-2xl font-bold text-gray-900">Gestão de Usuários</h1>
           <p className="text-gray-500">Gerencie os membros da sua equipe e suas permissões.</p>
         </div>
-        <button className="flex items-center space-x-2 bg-indigo-600 text-white px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors">
+        <button 
+          onClick={() => setIsInviting(true)}
+          className="flex items-center space-x-2 bg-indigo-600 text-white px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors"
+        >
           <UserPlus size={20} />
           <span>Convidar Usuário</span>
         </button>
       </div>
+
+      <AnimatePresence>
+        {isInviting && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-gray-900">Convidar Novo Usuário</h3>
+                <button onClick={() => setIsInviting(false)} className="text-gray-400 hover:text-gray-600">
+                  <X size={24} />
+                </button>
+              </div>
+
+              <form onSubmit={handleInvite} className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Nome Completo</label>
+                  <input 
+                    type="text"
+                    required
+                    value={inviteData.displayName}
+                    onChange={(e) => setInviteData({ ...inviteData, displayName: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">E-mail</label>
+                  <input 
+                    type="email"
+                    required
+                    value={inviteData.email}
+                    onChange={(e) => setInviteData({ ...inviteData, email: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Função</label>
+                  <select 
+                    value={inviteData.role}
+                    onChange={(e) => setInviteData({ ...inviteData, role: e.target.value as any })}
+                    className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                  >
+                    <option value="admin">Administrador</option>
+                    <option value="manager">Gerente</option>
+                    <option value="agent">Agente</option>
+                  </select>
+                </div>
+
+                <button 
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all mt-4 flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : 'Enviar Convite'}
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-4 border-b border-gray-100 bg-gray-50/50">
@@ -139,6 +243,7 @@ export function Users() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <button 
+                        onClick={() => handleDeleteUser(user.uid)}
                         disabled={user.uid === profile?.uid}
                         className="text-gray-400 hover:text-red-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                       >

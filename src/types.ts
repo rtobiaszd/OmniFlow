@@ -14,7 +14,7 @@ export interface User {
 
 export interface Integration {
   id: string;
-  provider: 'whatsapp' | 'email' | 'telegram' | 'jira' | 'github' | 'slack' | 'facebook' | 'instagram';
+  provider: 'whatsapp' | 'email' | 'telegram' | 'jira' | 'github' | 'slack' | 'facebook' | 'instagram' | 'webhook' | 'api';
   name: string;
   status: 'connected' | 'disconnected' | 'error';
   config: Record<string, any>;
@@ -36,7 +36,7 @@ export interface Workflow {
 
 export interface WorkflowNode {
   id: string;
-  type: 'trigger' | 'condition' | 'action' | 'ai' | 'delay';
+  type: 'trigger' | 'condition' | 'action' | 'ai' | 'delay' | 'webhook' | 'api';
   data: Record<string, any>;
   position: { x: number; y: number };
 }
@@ -61,6 +61,7 @@ export interface Stage {
   name: string;
   order: number;
   color: string;
+  useAI?: boolean;
   automation?: {
     onEnter?: string; // Workflow ID
   };
@@ -89,4 +90,13 @@ export interface Message {
   content: string;
   channel: 'whatsapp' | 'email' | 'telegram' | 'facebook' | 'instagram';
   timestamp: string;
+}
+
+export interface WorkflowTemplate {
+  id: string;
+  name: string;
+  description: string;
+  niche: string;
+  nodes: WorkflowNode[];
+  edges?: any[];
 }

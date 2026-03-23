@@ -11,7 +11,8 @@ import {
   X,
   PlusCircle,
   Layout,
-  Loader2
+  Loader2,
+  Trash2
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -30,12 +31,15 @@ export function Pipelines() {
   const [isAddingStage, setIsAddingStage] = useState(false);
   const [isAddingField, setIsAddingField] = useState(false);
   const [isAddingDeal, setIsAddingDeal] = useState(false);
+  const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [newPipelineName, setNewPipelineName] = useState('');
   const [newStageName, setNewStageName] = useState('');
   const [newFieldName, setNewFieldName] = useState('');
   const [newFieldType, setNewFieldType] = useState<'text' | 'number' | 'date' | 'select'>('text');
+  const [newFieldOptions, setNewFieldOptions] = useState('');
+  const [newFieldRequired, setNewFieldRequired] = useState(false);
   
   const [newDealTitle, setNewDealTitle] = useState('');
   const [newDealValue, setNewDealValue] = useState('');
@@ -94,6 +98,22 @@ export function Pipelines() {
     }
   };
 
+  const handleUpdateDeal = async () => {
+    if (!editingDeal || !profile?.tenantId) return;
+    setIsSubmitting(true);
+    try {
+      await pipelineService.updateDeal({
+        ...editingDeal,
+        value: Number(editingDeal.value) || 0
+      });
+      setEditingDeal(null);
+    } catch (error) {
+      console.error('Error updating deal:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleAddPipeline = async () => {
     if (!newPipelineName || !profile?.tenantId) return;
     setIsSubmitting(true);
@@ -109,6 +129,16 @@ export function Pipelines() {
     }
   };
 
+  const handleDeletePipeline = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this pipeline? All stages and deals will be lost.')) return;
+    try {
+      await pipelineService.deletePipeline(id);
+      if (activePipelineId === id) setActivePipelineId(null);
+    } catch (error) {
+      console.error('Error deleting pipeline:', error);
+    }
+  };
+
   const handleAddStage = async () => {
     if (!newStageName || !activePipeline) return;
     setIsSubmitting(true);
@@ -121,7 +151,7 @@ export function Pipelines() {
       };
       await pipelineService.updatePipeline({
         id: activePipeline.id,
-        stages: [...activePipeline.stages, newStage]
+        stages: [...(activePipeline.stages || []), newStage]
       });
       setNewStageName('');
       setIsAddingStage(false);
@@ -140,13 +170,16 @@ export function Pipelines() {
         id: `field_${Date.now()}`,
         name: newFieldName,
         type: newFieldType,
-        required: false
+        required: newFieldRequired,
+        options: newFieldType === 'select' ? newFieldOptions.split(',').map(o => o.trim()).filter(o => o) : undefined
       };
       await pipelineService.updatePipeline({
         id: activePipeline.id,
-        customFields: [...activePipeline.customFields, newField]
+        customFields: [...(activePipeline.customFields || []), newField]
       });
       setNewFieldName('');
+      setNewFieldOptions('');
+      setNewFieldRequired(false);
       setIsAddingField(false);
     } catch (error) {
       console.error('Error adding field:', error);
@@ -193,6 +226,15 @@ export function Pipelines() {
               >
                 <PlusCircle size={20} />
               </button>
+              {activePipeline && (
+                <button 
+                  onClick={() => handleDeletePipeline(activePipeline.id)}
+                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                  title="Delete Pipeline"
+                >
+                  <X size={20} />
+                </button>
+              )}
             </div>
           </div>
 
@@ -249,7 +291,8 @@ export function Pipelines() {
                 <motion.div 
                   key={deal.id}
                   layoutId={deal.id}
-                  className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing group"
+                  onClick={() => setEditingDeal(deal)}
+                  className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer group"
                 >
                   <div className="flex justify-between items-start mb-3">
                     <h4 className="font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">{deal.title}</h4>
@@ -335,14 +378,43 @@ export function Pipelines() {
                 <h3 className="text-xl font-bold text-gray-900">New Deal</h3>
                 <button onClick={() => setIsAddingDeal(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
               </div>
-              <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
-                <div>
+              <form onSubmit={(e) => { e.preventDefault(); handleAddDeal(); }} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+                {/* Dynamic Custom Fields - Moved to top as requested */}
+                {activePipeline?.customFields?.map(field => (
+                  <div key={field.id}>
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">
+                      {field.name} {field.required && <span className="text-red-500">*</span>}
+                    </label>
+                    {field.type === 'select' ? (
+                      <select 
+                        value={newDealCustomValues[field.id] || ''}
+                        onChange={(e) => setNewDealCustomValues({...newDealCustomValues, [field.id]: e.target.value})}
+                        className="w-full px-4 py-2 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500"
+                        required={field.required}
+                      >
+                        <option value="">Select...</option>
+                        {field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                    ) : (
+                      <input 
+                        type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
+                        value={newDealCustomValues[field.id] || ''}
+                        onChange={(e) => setNewDealCustomValues({...newDealCustomValues, [field.id]: e.target.value})}
+                        className="w-full px-4 py-2 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500"
+                        required={field.required}
+                      />
+                    )}
+                  </div>
+                ))}
+
+                <div className="pt-4 border-t border-gray-100">
                   <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Deal Title</label>
                   <input 
                     type="text" 
                     value={newDealTitle}
                     onChange={(e) => setNewDealTitle(e.target.value)}
                     className="w-full px-4 py-2 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500"
+                    required
                   />
                 </div>
                 <div>
@@ -363,15 +435,75 @@ export function Pipelines() {
                     className="w-full px-4 py-2 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
-                
+
+                <button 
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all mt-4 flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : 'Create Deal'}
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+        {editingDeal && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-gray-900">Edit Deal</h3>
+                <button onClick={() => setEditingDeal(null)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+              </div>
+              <form onSubmit={(e) => { e.preventDefault(); handleUpdateDeal(); }} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Deal Title</label>
+                  <input 
+                    type="text" 
+                    value={editingDeal.title}
+                    onChange={(e) => setEditingDeal({...editingDeal, title: e.target.value})}
+                    className="w-full px-4 py-2 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Company</label>
+                  <input 
+                    type="text" 
+                    value={editingDeal.company}
+                    onChange={(e) => setEditingDeal({...editingDeal, company: e.target.value})}
+                    className="w-full px-4 py-2 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Value ($)</label>
+                  <input 
+                    type="number" 
+                    value={editingDeal.value}
+                    onChange={(e) => setEditingDeal({...editingDeal, value: Number(e.target.value)})}
+                    className="w-full px-4 py-2 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
                 {/* Dynamic Custom Fields */}
                 {activePipeline?.customFields.map(field => (
                   <div key={field.id}>
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">{field.name}</label>
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">
+                      {field.name} {field.required && <span className="text-red-500">*</span>}
+                    </label>
                     {field.type === 'select' ? (
                       <select 
-                        onChange={(e) => setNewDealCustomValues({...newDealCustomValues, [field.id]: e.target.value})}
+                        value={editingDeal.customValues?.[field.id] || ''}
+                        onChange={(e) => setEditingDeal({
+                          ...editingDeal, 
+                          customValues: { ...editingDeal.customValues, [field.id]: e.target.value }
+                        })}
                         className="w-full px-4 py-2 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500"
+                        required={field.required}
                       >
                         <option value="">Select...</option>
                         {field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
@@ -379,21 +511,26 @@ export function Pipelines() {
                     ) : (
                       <input 
                         type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
-                        onChange={(e) => setNewDealCustomValues({...newDealCustomValues, [field.id]: e.target.value})}
+                        value={editingDeal.customValues?.[field.id] || ''}
+                        onChange={(e) => setEditingDeal({
+                          ...editingDeal, 
+                          customValues: { ...editingDeal.customValues, [field.id]: e.target.value }
+                        })}
                         className="w-full px-4 py-2 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500"
+                        required={field.required}
                       />
                     )}
                   </div>
                 ))}
 
                 <button 
-                  onClick={handleAddDeal}
+                  type="submit"
                   disabled={isSubmitting}
                   className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all mt-4 flex items-center justify-center gap-2"
                 >
-                  {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : 'Create Deal'}
+                  {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : 'Save Changes'}
                 </button>
-              </div>
+              </form>
             </motion.div>
           </div>
         )}
@@ -522,8 +659,30 @@ export function Pipelines() {
                       <option value="text">Text</option>
                       <option value="number">Number</option>
                       <option value="date">Date</option>
-                      <option value="select">Select</option>
+                      <option value="select">Select (Dropdown)</option>
                     </select>
+                  </div>
+                  {newFieldType === 'select' && (
+                    <div className="mt-2">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Options (comma separated)</label>
+                      <input 
+                        type="text" 
+                        value={newFieldOptions}
+                        onChange={(e) => setNewFieldOptions(e.target.value)}
+                        placeholder="e.g. Hot, Warm, Cold" 
+                        className="w-full px-3 py-2 bg-gray-50 border-none rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 mt-2">
+                    <input 
+                      type="checkbox" 
+                      id="required"
+                      checked={newFieldRequired}
+                      onChange={(e) => setNewFieldRequired(e.target.checked)}
+                      className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <label htmlFor="required" className="text-xs font-bold text-gray-700">Mark as Required</label>
                   </div>
                   <button 
                     onClick={handleAddField}

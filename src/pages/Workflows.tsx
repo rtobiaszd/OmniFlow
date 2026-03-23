@@ -26,6 +26,45 @@ import { Workflow, Integration, Pipeline } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { WorkflowEditor } from '../components/WorkflowEditor';
 
+const WORKFLOW_TEMPLATES = [
+  {
+    id: 'template-fruit',
+    name: 'Frutaria: Alerta de Estoque Baixo',
+    description: 'Notifica o gerente quando o estoque de frutas sazonais atinge um nível crítico.',
+    niche: 'Frutaria',
+    nodes: [
+      { id: '1', type: 'trigger' as const, data: { label: 'Estoque Baixo' }, position: { x: 250, y: 0 } },
+      { id: '2', type: 'action' as const, data: { label: 'Enviar WhatsApp Gerente' }, position: { x: 250, y: 100 } }
+    ],
+    edges: [{ id: 'e1-2', source: '1', target: '2' }]
+  },
+  {
+    id: 'template-grocery',
+    name: 'Mercearia: Promoção Relâmpago',
+    description: 'Envia ofertas para clientes VIP quando novos produtos chegam.',
+    niche: 'Mercearia',
+    nodes: [
+      { id: '1', type: 'trigger' as const, data: { label: 'Novo Produto Chegou' }, position: { x: 250, y: 0 } },
+      { id: '2', type: 'ai' as const, data: { label: 'Gerar Texto Promocional' }, position: { x: 250, y: 100 } },
+      { id: '3', type: 'action' as const, data: { label: 'Disparar Email Marketing' }, position: { x: 250, y: 200 } }
+    ],
+    edges: [{ id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3' }]
+  },
+  {
+    id: 'template-restaurant',
+    name: 'Restaurante: Confirmação de Reserva',
+    description: 'Automatiza a confirmação de mesas via WhatsApp e Email.',
+    niche: 'Restaurante',
+    nodes: [
+      { id: '1', type: 'trigger' as const, data: { label: 'Nova Reserva' }, position: { x: 250, y: 0 } },
+      { id: '2', type: 'action' as const, data: { label: 'Confirmar via WhatsApp' }, position: { x: 250, y: 100 } },
+      { id: '3', type: 'delay' as const, data: { label: 'Aguardar 1h antes' }, position: { x: 250, y: 200 } },
+      { id: '4', type: 'action' as const, data: { label: 'Lembrete Final' }, position: { x: 250, y: 300 } }
+    ],
+    edges: [{ id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3' }, { id: 'e3-4', source: '3', target: '4' }]
+  }
+];
+
 export function Workflows() {
   const { profile } = useAuth();
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
@@ -60,6 +99,25 @@ export function Workflows() {
       unsubPipelines();
     };
   }, [profile?.tenantId]);
+
+  const handleCreateFromTemplate = async (template: typeof WORKFLOW_TEMPLATES[0]) => {
+    if (!profile?.tenantId) return;
+    setIsSubmitting(true);
+    try {
+      const wf = await workflowService.createWorkflow(profile.tenantId, template.name, template.description);
+      if (wf) {
+        await workflowService.updateWorkflow({
+          ...wf,
+          nodes: template.nodes,
+          edges: template.edges
+        });
+      }
+    } catch (error) {
+      console.error('Error creating from template:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,6 +180,44 @@ export function Workflows() {
         >
           <Plus size={20} /> Create Workflow
         </button>
+      </div>
+
+      {/* Templates Section */}
+      <div className="mb-12">
+        <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+          <Layout size={20} className="text-indigo-600" />
+          Sugestões por Nicho
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {WORKFLOW_TEMPLATES.map(template => (
+            <motion.div 
+              key={template.id}
+              whileHover={{ y: -4 }}
+              className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group"
+            >
+              <div className="flex justify-between items-start mb-4">
+                <span className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded-full uppercase tracking-wider">
+                  {template.niche}
+                </span>
+                <Zap size={18} className="text-gray-300 group-hover:text-amber-400 transition-colors" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">{template.name}</h3>
+              <p className="text-xs text-gray-500 mb-6 line-clamp-2 leading-relaxed">{template.description}</p>
+              <button 
+                onClick={() => handleCreateFromTemplate(template)}
+                disabled={isSubmitting}
+                className="w-full py-3 bg-gray-50 text-gray-600 rounded-2xl text-xs font-bold hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center gap-2"
+              >
+                {isSubmitting ? <Loader2 className="animate-spin" size={14} /> : (
+                  <>
+                    Usar Template
+                    <ChevronRight size={14} />
+                  </>
+                )}
+              </button>
+            </motion.div>
+          ))}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
