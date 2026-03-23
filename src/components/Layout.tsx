@@ -5,24 +5,26 @@ import {
   GitBranch, 
   Zap, 
   Plug, 
-  Users, 
+  Users as UsersIcon, 
   Calendar, 
   Settings,
   ChevronLeft,
   ChevronRight,
   LogOut,
   Bell,
-  Languages
+  Languages,
+  UserCircle
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { tenantService, Tenant } from '../services/tenantService';
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = React.useState(false);
   const location = useLocation();
-  const { logout } = useAuth();
+  const { logout, profile } = useAuth();
   const { t } = useTranslation();
 
   const navItems = [
@@ -31,9 +33,14 @@ export function Sidebar() {
     { icon: GitBranch, label: t('common.pipelines'), path: '/pipelines' },
     { icon: Zap, label: t('common.workflows'), path: '/workflows' },
     { icon: Plug, label: t('common.integrations'), path: '/integrations' },
-    { icon: Users, label: t('common.contacts'), path: '/contacts' },
+    { icon: UsersIcon, label: t('common.contacts'), path: '/contacts' },
     { icon: Calendar, label: t('common.calendar'), path: '/calendar' },
   ];
+
+  // Add Team management for admins
+  if (profile?.role === 'admin') {
+    navItems.push({ icon: UserCircle, label: 'Equipe', path: '/users' });
+  }
 
   return (
     <div 
@@ -52,7 +59,7 @@ export function Sidebar() {
         </button>
       </div>
 
-      <nav className="flex-1 px-3 space-y-1">
+      <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
           return (
@@ -94,8 +101,15 @@ export function Sidebar() {
 }
 
 export function Topbar() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { i18n } = useTranslation();
+  const [tenant, setTenant] = React.useState<Tenant | null>(null);
+
+  React.useEffect(() => {
+    if (profile?.tenantId) {
+      tenantService.getTenant(profile.tenantId).then(setTenant);
+    }
+  }, [profile?.tenantId]);
 
   const changeLanguage = (lng: string) => {
     i18n.changeLanguage(lng);
@@ -105,10 +119,14 @@ export function Topbar() {
     <header className="h-16 border-b border-gray-200 bg-white flex items-center justify-between px-8">
       <div className="flex items-center gap-4">
         <div className="h-8 w-8 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-xs">
-          {user?.displayName?.charAt(0) || 'U'}
+          {tenant?.name?.charAt(0) || 'T'}
         </div>
-        <span className="font-semibold text-gray-700">Acme Corp</span>
-        <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-500 font-mono uppercase tracking-wider">Pro Plan</span>
+        <span className="font-semibold text-gray-700">{tenant?.name || 'Carregando...'}</span>
+        {tenant?.plan && (
+          <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-500 font-mono uppercase tracking-wider">
+            {tenant.plan} Plan
+          </span>
+        )}
       </div>
 
       <div className="flex items-center gap-6">
@@ -132,11 +150,11 @@ export function Topbar() {
         <div className="flex items-center gap-3 pl-6 border-l border-gray-200">
           <div className="text-right">
             <div className="text-sm font-semibold text-gray-900">{user?.displayName || 'User'}</div>
-            <div className="text-xs text-gray-500">{user?.email}</div>
+            <div className="text-xs text-gray-500 capitalize">{profile?.role || 'Visitante'}</div>
           </div>
           <div className="h-10 w-10 rounded-full bg-gray-200 overflow-hidden">
             <img 
-              src={user?.photoURL || "https://picsum.photos/seed/user/100/100"} 
+              src={user?.photoURL || `https://ui-avatars.com/api/?name=${user?.displayName}`} 
               alt="Avatar" 
               referrerPolicy="no-referrer" 
             />

@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Sidebar, Topbar } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { Inbox } from './pages/Inbox';
@@ -7,10 +7,13 @@ import { Pipelines } from './pages/Pipelines';
 import { Workflows } from './pages/Workflows';
 import { Integrations } from './pages/Integrations';
 import { Login } from './pages/Login';
+import { Setup } from './pages/Setup';
+import { Users } from './pages/Users';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -22,6 +25,21 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!user) {
     return <Navigate to="/login" />;
+  }
+
+  // If user is logged in but has no profile, and is not on the setup page, redirect to setup
+  if (!profile && location.pathname !== '/setup') {
+    return <Navigate to="/setup" />;
+  }
+
+  // If user has a profile and is on the setup page, redirect to dashboard
+  if (profile && location.pathname === '/setup') {
+    return <Navigate to="/" />;
+  }
+
+  // For pages that don't need the sidebar/topbar (like setup)
+  if (location.pathname === '/setup') {
+    return <>{children}</>;
   }
 
   return (
@@ -43,11 +61,13 @@ export default function App() {
       <Router>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/setup" element={<ProtectedRoute><Setup /></ProtectedRoute>} />
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
           <Route path="/pipelines" element={<ProtectedRoute><Pipelines /></ProtectedRoute>} />
           <Route path="/workflows" element={<ProtectedRoute><Workflows /></ProtectedRoute>} />
           <Route path="/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
+          <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Router>

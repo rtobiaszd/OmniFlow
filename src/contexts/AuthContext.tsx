@@ -6,22 +6,35 @@ import {
   User 
 } from 'firebase/auth';
 import { auth, googleProvider, isFirebaseConfigured } from '../lib/firebase';
+import { userService, UserProfile } from '../services/userService';
 
 interface AuthContextType {
   user: User | null;
+  profile: UserProfile | null;
   loading: boolean;
   login: () => Promise<void>;
   logout: () => Promise<void>;
   isConfigured: boolean;
   error: string | null;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const refreshProfile = async () => {
+    if (user) {
+      const userProfile = await userService.getProfile(user.uid);
+      setProfile(userProfile);
+    } else {
+      setProfile(null);
+    }
+  };
 
   useEffect(() => {
     if (!isFirebaseConfigured || !auth) {
@@ -29,8 +42,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
+      if (user) {
+        const userProfile = await userService.getProfile(user.uid);
+        setProfile(userProfile);
+      } else {
+        setProfile(null);
+      }
       setLoading(false);
     });
     return unsubscribe;
@@ -64,7 +83,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isConfigured: isFirebaseConfigured, error }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      profile, 
+      loading, 
+      login, 
+      logout, 
+      isConfigured: isFirebaseConfigured, 
+      error,
+      refreshProfile
+    }}>
       {!loading && children}
     </AuthContext.Provider>
   );
