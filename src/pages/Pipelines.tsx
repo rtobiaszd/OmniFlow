@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Plus, 
   MoreHorizontal, 
@@ -10,118 +10,158 @@ import {
   Settings,
   X,
   PlusCircle,
-  Layout
+  Layout,
+  Loader2
 } from 'lucide-react';
-import { cn } from '@/src/lib/utils';
+import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
-import { Pipeline, Stage, Deal, CustomField } from '@/src/types';
+import { Pipeline, Stage, Deal, CustomField } from '../types';
+import { pipelineService } from '../services/pipelineService';
+import { useAuth } from '../contexts/AuthContext';
 
 export function Pipelines() {
-  const [pipelines, setPipelines] = React.useState<Pipeline[]>([]);
-  const [activePipelineId, setActivePipelineId] = React.useState<string | null>(null);
-  const [deals, setDeals] = React.useState<Deal[]>([
-    { id: '1', title: 'Enterprise License', company: 'TechCorp', value: 12000, stageId: 's1', pipelineId: 'p1', priority: 'high', status: 'open', customValues: {}, assignedTo: 'JD', createdAt: '2026-03-20', contactId: 'c1' },
-    { id: '2', title: 'API Integration', company: 'GlobalSoft', value: 5500, stageId: 's1', pipelineId: 'p1', priority: 'medium', status: 'open', customValues: {}, assignedTo: 'AS', createdAt: '2026-03-21', contactId: 'c2' },
-    { id: '3', title: 'Support Issue #1', company: 'StartupInc', value: 0, stageId: 's7', pipelineId: 'p2', priority: 'high', status: 'open', customValues: { cf3: 'P0' }, assignedTo: 'JD', createdAt: '2026-03-22', contactId: 'c3' },
-  ]);
+  const { profile } = useAuth();
+  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
+  const [activePipelineId, setActivePipelineId] = useState<string | null>(null);
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [isAddingPipeline, setIsAddingPipeline] = React.useState(false);
-  const [isAddingStage, setIsAddingStage] = React.useState(false);
-  const [isAddingField, setIsAddingField] = React.useState(false);
-  const [isAddingDeal, setIsAddingDeal] = React.useState(false);
-  const [newPipelineName, setNewPipelineName] = React.useState('');
-  const [newStageName, setNewStageName] = React.useState('');
-  const [newFieldName, setNewFieldName] = React.useState('');
-  const [newFieldType, setNewFieldType] = React.useState<'text' | 'number' | 'date' | 'select'>('text');
+  const [isAddingPipeline, setIsAddingPipeline] = useState(false);
+  const [isAddingStage, setIsAddingStage] = useState(false);
+  const [isAddingField, setIsAddingField] = useState(false);
+  const [isAddingDeal, setIsAddingDeal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [newPipelineName, setNewPipelineName] = useState('');
+  const [newStageName, setNewStageName] = useState('');
+  const [newFieldName, setNewFieldName] = useState('');
+  const [newFieldType, setNewFieldType] = useState<'text' | 'number' | 'date' | 'select'>('text');
   
-  const [newDealTitle, setNewDealTitle] = React.useState('');
-  const [newDealValue, setNewDealValue] = React.useState('');
-  const [newDealCompany, setNewDealCompany] = React.useState('');
-  const [newDealCustomValues, setNewDealCustomValues] = React.useState<Record<string, any>>({});
-  const [targetStageId, setTargetStageId] = React.useState<string | null>(null);
+  const [newDealTitle, setNewDealTitle] = useState('');
+  const [newDealValue, setNewDealValue] = useState('');
+  const [newDealCompany, setNewDealCompany] = useState('');
+  const [newDealCustomValues, setNewDealCustomValues] = useState<Record<string, any>>({});
+  const [targetStageId, setTargetStageId] = useState<string | null>(null);
 
-  const addDeal = () => {
-    if (!newDealTitle || !activePipelineId || !targetStageId) return;
-    const newD: Deal = {
-      id: `d${Date.now()}`,
-      title: newDealTitle,
-      company: newDealCompany,
-      value: Number(newDealValue) || 0,
-      stageId: targetStageId,
-      pipelineId: activePipelineId,
-      priority: 'medium',
-      status: 'open',
-      customValues: newDealCustomValues,
-      assignedTo: 'JD',
-      createdAt: new Date().toISOString().split('T')[0],
-      contactId: 'c_new'
+  useEffect(() => {
+    if (!profile?.tenantId) return;
+
+    const unsubPipelines = pipelineService.subscribeToPipelines(profile.tenantId, (pipes) => {
+      setPipelines(pipes);
+      if (pipes.length > 0 && !activePipelineId) {
+        setActivePipelineId(pipes[0].id);
+      }
+      setLoading(false);
+    });
+
+    const unsubDeals = pipelineService.subscribeToDeals(profile.tenantId, (allDeals) => {
+      setDeals(allDeals);
+    });
+
+    return () => {
+      unsubPipelines();
+      unsubDeals();
     };
-    setDeals([...deals, newD]);
-    setNewDealTitle('');
-    setNewDealValue('');
-    setNewDealCompany('');
-    setNewDealCustomValues({});
-    setIsAddingDeal(false);
-  };
-
-  React.useEffect(() => {
-    fetch('/api/pipelines')
-      .then(res => res.json())
-      .then(data => {
-        setPipelines(data);
-        if (data.length > 0) setActivePipelineId(data[0].id);
-      });
-  }, []);
+  }, [profile?.tenantId]);
 
   const activePipeline = pipelines.find(p => p.id === activePipelineId);
 
-  const addPipeline = () => {
-    if (!newPipelineName) return;
-    const newP: Pipeline = {
-      id: `p${Date.now()}`,
-      name: newPipelineName,
-      stages: [
-        { id: `s${Date.now()}`, name: 'New Stage', order: 0, color: 'bg-blue-500' }
-      ],
-      customFields: []
-    };
-    setPipelines([...pipelines, newP]);
-    setActivePipelineId(newP.id);
-    setNewPipelineName('');
-    setIsAddingPipeline(false);
+  const handleAddDeal = async () => {
+    if (!newDealTitle || !activePipelineId || !targetStageId || !profile?.tenantId) return;
+    setIsSubmitting(true);
+    try {
+      await pipelineService.createDeal(profile.tenantId, {
+        title: newDealTitle,
+        company: newDealCompany,
+        value: Number(newDealValue) || 0,
+        stageId: targetStageId,
+        pipelineId: activePipelineId,
+        priority: 'medium',
+        status: 'open',
+        customValues: newDealCustomValues,
+        assignedTo: profile.name || 'User',
+        contactId: '' // Optional for now
+      });
+      setNewDealTitle('');
+      setNewDealValue('');
+      setNewDealCompany('');
+      setNewDealCustomValues({});
+      setIsAddingDeal(false);
+    } catch (error) {
+      console.error('Error adding deal:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const addStage = () => {
-    if (!newStageName || !activePipelineId) return;
-    const updatedPipelines = pipelines.map(p => {
-      if (p.id === activePipelineId) {
-        return {
-          ...p,
-          stages: [...p.stages, { id: `s${Date.now()}`, name: newStageName, order: p.stages.length, color: 'bg-indigo-500' }]
-        };
-      }
-      return p;
-    });
-    setPipelines(updatedPipelines);
-    setNewStageName('');
-    setIsAddingStage(false);
+  const handleAddPipeline = async () => {
+    if (!newPipelineName || !profile?.tenantId) return;
+    setIsSubmitting(true);
+    try {
+      const newP = await pipelineService.createPipeline(profile.tenantId, newPipelineName);
+      if (newP) setActivePipelineId(newP.id);
+      setNewPipelineName('');
+      setIsAddingPipeline(false);
+    } catch (error) {
+      console.error('Error adding pipeline:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const addField = () => {
-    if (!newFieldName || !activePipelineId) return;
-    const updatedPipelines = pipelines.map(p => {
-      if (p.id === activePipelineId) {
-        return {
-          ...p,
-          customFields: [...p.customFields, { id: `cf${Date.now()}`, name: newFieldName, type: newFieldType, required: false }]
-        };
-      }
-      return p;
-    });
-    setPipelines(updatedPipelines);
-    setNewFieldName('');
-    setIsAddingField(false);
+  const handleAddStage = async () => {
+    if (!newStageName || !activePipeline) return;
+    setIsSubmitting(true);
+    try {
+      const newStage: Stage = {
+        id: `stage_${Date.now()}`,
+        name: newStageName,
+        order: activePipeline.stages.length,
+        color: 'bg-indigo-500'
+      };
+      await pipelineService.updatePipeline({
+        id: activePipeline.id,
+        stages: [...activePipeline.stages, newStage]
+      });
+      setNewStageName('');
+      setIsAddingStage(false);
+    } catch (error) {
+      console.error('Error adding stage:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  const handleAddField = async () => {
+    if (!newFieldName || !activePipeline) return;
+    setIsSubmitting(true);
+    try {
+      const newField: CustomField = {
+        id: `field_${Date.now()}`,
+        name: newFieldName,
+        type: newFieldType,
+        required: false
+      };
+      await pipelineService.updatePipeline({
+        id: activePipeline.id,
+        customFields: [...activePipeline.customFields, newField]
+      });
+      setNewFieldName('');
+      setIsAddingField(false);
+    } catch (error) {
+      console.error('Error adding field:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="animate-spin text-indigo-600" size={48} />
+      </div>
+    );
+  }
 
   return (
     <div className="h-[calc(100vh-64px)] flex flex-col bg-gray-50">
@@ -133,15 +173,19 @@ export function Pipelines() {
               <span>CRM</span> <ChevronRight size={14} /> <span className="font-semibold text-gray-900">Pipelines</span>
             </div>
             <div className="flex items-center gap-4">
-              <select 
-                value={activePipelineId || ''} 
-                onChange={(e) => setActivePipelineId(e.target.value)}
-                className="text-2xl font-bold text-gray-900 bg-transparent border-none focus:ring-0 p-0 cursor-pointer hover:text-indigo-600 transition-colors"
-              >
-                {pipelines.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
+              {pipelines.length > 0 ? (
+                <select 
+                  value={activePipelineId || ''} 
+                  onChange={(e) => setActivePipelineId(e.target.value)}
+                  className="text-2xl font-bold text-gray-900 bg-transparent border-none focus:ring-0 p-0 cursor-pointer hover:text-indigo-600 transition-colors"
+                >
+                  {pipelines.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <span className="text-2xl font-bold text-gray-400 italic">No Pipelines</span>
+              )}
               <button 
                 onClick={() => setIsAddingPipeline(true)}
                 className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
@@ -157,7 +201,8 @@ export function Pipelines() {
           <div className="flex gap-2">
             <button 
               onClick={() => setIsAddingField(true)}
-              className="px-3 py-1.5 text-xs font-bold text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg border border-gray-200 flex items-center gap-2"
+              disabled={!activePipeline}
+              className="px-3 py-1.5 text-xs font-bold text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg border border-gray-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Settings size={14} /> Custom Fields
             </button>
@@ -169,7 +214,16 @@ export function Pipelines() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
             <input type="text" placeholder="Search deals..." className="pl-10 pr-4 py-2 bg-gray-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-indigo-500" />
           </div>
-          <button className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 flex items-center gap-2 shadow-lg shadow-indigo-200">
+          <button 
+            onClick={() => {
+              if (activePipeline?.stages?.length) {
+                setTargetStageId(activePipeline.stages[0].id);
+                setIsAddingDeal(true);
+              }
+            }}
+            disabled={!activePipeline}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 flex items-center gap-2 shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <Plus size={16} /> New Deal
           </button>
         </div>
@@ -177,7 +231,7 @@ export function Pipelines() {
 
       {/* Board */}
       <div className="flex-1 overflow-x-auto p-8 pt-6 flex gap-6 items-start">
-        {activePipeline?.stages.sort((a, b) => a.order - b.order).map((stage) => (
+        {activePipeline?.stages?.sort((a, b) => a.order - b.order).map((stage) => (
           <div key={stage.id} className="w-80 shrink-0 flex flex-col gap-4">
             <div className="flex items-center justify-between px-2">
               <div className="flex items-center gap-2">
@@ -206,8 +260,8 @@ export function Pipelines() {
                   </div>
                   
                   {/* Custom Fields Display */}
-                  {activePipeline.customFields.map(field => (
-                    deal.customValues[field.id] && (
+                  {activePipeline?.customFields?.map(field => (
+                    deal.customValues?.[field.id] && (
                       <div key={field.id} className="mb-2 px-2 py-1 bg-gray-50 rounded text-[10px] text-gray-500 flex justify-between">
                         <span className="font-medium">{field.name}:</span>
                         <span>{deal.customValues[field.id]}</span>
@@ -221,7 +275,7 @@ export function Pipelines() {
                     </div>
                     <div className="flex -space-x-2">
                       <div className="w-6 h-6 rounded-full bg-indigo-100 border-2 border-white flex items-center justify-center text-[8px] font-bold text-indigo-600">
-                        {deal.assignedTo}
+                        {deal.assignedTo?.substring(0, 2).toUpperCase()}
                       </div>
                     </div>
                   </div>
@@ -241,15 +295,30 @@ export function Pipelines() {
         ))}
 
         {/* Add Stage Button */}
-        <button 
-          onClick={() => setIsAddingStage(true)}
-          className="w-80 shrink-0 h-[calc(100vh-250px)] border-2 border-dashed border-gray-200 rounded-3xl flex flex-col items-center justify-center gap-4 text-gray-400 hover:border-indigo-300 hover:text-indigo-500 hover:bg-indigo-50/30 transition-all group"
-        >
-          <div className="p-4 bg-gray-50 rounded-2xl group-hover:bg-indigo-50 transition-colors">
-            <Plus size={32} />
+        {activePipeline && (
+          <button 
+            onClick={() => setIsAddingStage(true)}
+            className="w-80 shrink-0 h-[calc(100vh-250px)] border-2 border-dashed border-gray-200 rounded-3xl flex flex-col items-center justify-center gap-4 text-gray-400 hover:border-indigo-300 hover:text-indigo-500 hover:bg-indigo-50/30 transition-all group"
+          >
+            <div className="p-4 bg-gray-50 rounded-2xl group-hover:bg-indigo-50 transition-colors">
+              <Plus size={32} />
+            </div>
+            <span className="font-bold">Add New Stage</span>
+          </button>
+        )}
+
+        {!activePipeline && !loading && (
+          <div className="flex-1 flex flex-col items-center justify-center text-gray-400 gap-4">
+            <Layout size={64} className="opacity-20" />
+            <p className="font-medium">Create a pipeline to start managing deals</p>
+            <button 
+              onClick={() => setIsAddingPipeline(true)}
+              className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all"
+            >
+              Create First Pipeline
+            </button>
           </div>
-          <span className="font-bold">Add New Stage</span>
-        </button>
+        )}
       </div>
 
       {/* Modals */}
@@ -318,10 +387,11 @@ export function Pipelines() {
                 ))}
 
                 <button 
-                  onClick={addDeal}
-                  className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all mt-4"
+                  onClick={handleAddDeal}
+                  disabled={isSubmitting}
+                  className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all mt-4 flex items-center justify-center gap-2"
                 >
-                  Create Deal
+                  {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : 'Create Deal'}
                 </button>
               </div>
             </motion.div>
@@ -351,10 +421,11 @@ export function Pipelines() {
                   />
                 </div>
                 <button 
-                  onClick={addPipeline}
-                  className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all"
+                  onClick={handleAddPipeline}
+                  disabled={isSubmitting}
+                  className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
                 >
-                  Create Pipeline
+                  {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : 'Create Pipeline'}
                 </button>
               </div>
             </motion.div>
@@ -385,10 +456,11 @@ export function Pipelines() {
                   />
                 </div>
                 <button 
-                  onClick={addStage}
-                  className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all"
+                  onClick={handleAddStage}
+                  disabled={isSubmitting}
+                  className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
                 >
-                  Add Stage
+                  {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : 'Add Stage'}
                 </button>
               </div>
             </motion.div>
@@ -416,7 +488,18 @@ export function Pipelines() {
                         <div className="font-bold text-gray-900 text-sm">{f.name}</div>
                         <div className="text-[10px] text-gray-400 uppercase font-bold">{f.type}</div>
                       </div>
-                      <button className="text-red-400 hover:text-red-600"><X size={16} /></button>
+                      <button 
+                        onClick={async () => {
+                          if (!activePipeline) return;
+                          await pipelineService.updatePipeline({
+                            id: activePipeline.id,
+                            customFields: activePipeline.customFields.filter(field => field.id !== f.id)
+                          });
+                        }}
+                        className="text-red-400 hover:text-red-600"
+                      >
+                        <X size={16} />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -443,10 +526,11 @@ export function Pipelines() {
                     </select>
                   </div>
                   <button 
-                    onClick={addField}
+                    onClick={handleAddField}
+                    disabled={isSubmitting}
                     className="w-full py-2 bg-indigo-50 text-indigo-600 rounded-xl font-bold hover:bg-indigo-100 transition-all flex items-center justify-center gap-2"
                   >
-                    <Plus size={16} /> Add Field
+                    {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : <><Plus size={16} /> Add Field</>}
                   </button>
                 </div>
               </div>

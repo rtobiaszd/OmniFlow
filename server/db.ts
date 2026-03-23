@@ -42,6 +42,7 @@ export const db = {
       name: 'WhatsApp Lead Capture', 
       description: 'Automatically creates a deal when a new contact messages on WhatsApp.', 
       active: true, 
+      tenantId: 't1',
       nodes: [
         { id: 'n1', type: 'trigger', data: { event: 'message_received', channel: 'whatsapp' }, position: { x: 0, y: 0 } },
         { id: 'n2', type: 'action', data: { action: 'create_deal', pipelineId: 'p1', stageId: 's1' }, position: { x: 200, y: 0 } }

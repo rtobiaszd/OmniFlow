@@ -64,7 +64,11 @@ export function Inbox() {
                 <img src={contact.avatar} className="w-12 h-12 rounded-full object-cover" alt="" referrerPolicy="no-referrer" />
                 <div className={cn(
                   "absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center text-[10px] text-white",
-                  contact.channel === 'whatsapp' ? "bg-green-500" : contact.channel === 'telegram' ? "bg-blue-400" : "bg-red-400"
+                  contact.channel === 'whatsapp' ? "bg-green-500" : 
+                  contact.channel === 'telegram' ? "bg-blue-400" : 
+                  contact.channel === 'facebook' ? "bg-blue-700" :
+                  contact.channel === 'instagram' ? "bg-pink-600" :
+                  "bg-red-400"
                 )}>
                   {contact.channel[0].toUpperCase()}
                 </div>

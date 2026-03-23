@@ -14,10 +14,11 @@ export interface User {
 
 export interface Integration {
   id: string;
-  provider: 'whatsapp' | 'email' | 'telegram' | 'jira' | 'github';
+  provider: 'whatsapp' | 'email' | 'telegram' | 'jira' | 'github' | 'slack' | 'facebook' | 'instagram';
   name: string;
   status: 'connected' | 'disconnected' | 'error';
   config: Record<string, any>;
+  tenantId: string;
   authUrl?: string;
 }
 
@@ -27,6 +28,10 @@ export interface Workflow {
   description: string;
   active: boolean;
   nodes: WorkflowNode[];
+  edges?: any[]; // For node-based flow
+  integrationId?: string;
+  pipelineId?: string;
+  tenantId: string;
 }
 
 export interface WorkflowNode {
@@ -82,6 +87,6 @@ export interface Message {
   senderId?: string;
   contactId?: string;
   content: string;
-  channel: 'whatsapp' | 'email' | 'telegram';
+  channel: 'whatsapp' | 'email' | 'telegram' | 'facebook' | 'instagram';
   timestamp: string;
 }

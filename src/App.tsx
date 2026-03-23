@@ -9,6 +9,9 @@ import { Integrations } from './pages/Integrations';
 import { Login } from './pages/Login';
 import { Setup } from './pages/Setup';
 import { Users } from './pages/Users';
+import { Contacts } from './pages/Contacts';
+import { Calendar } from './pages/Calendar';
+import { Settings } from './pages/Settings';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -68,6 +71,9 @@ export default function App() {
           <Route path="/workflows" element={<ProtectedRoute><Workflows /></ProtectedRoute>} />
           <Route path="/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
           <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
+          <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
+          <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Router>
