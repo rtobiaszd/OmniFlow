@@ -7,8 +7,6 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  LineChart,
-  Line,
   AreaChart,
   Area
 } from 'recharts';
@@ -21,6 +19,8 @@ import {
   ArrowDownRight
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { cn } from '../lib/utils';
+import { useTranslation } from 'react-i18next';
 
 const data = [
   { name: 'Mon', convs: 40, deals: 24, success: 95 },
@@ -55,14 +55,14 @@ const StatCard = ({ title, value, change, icon: Icon, trend }: any) => (
   </motion.div>
 );
 
-import { cn } from '@/src/lib/utils';
-
 export function Dashboard() {
+  const { t } = useTranslation();
+
   return (
     <div className="p-8 space-y-8 max-w-7xl mx-auto">
       <div className="flex justify-between items-end">
         <div>
-          <h1 className="text-4xl font-bold text-gray-900 tracking-tight">Dashboard</h1>
+          <h1 className="text-4xl font-bold text-gray-900 tracking-tight">{t('common.dashboard')}</h1>
           <p className="text-gray-500 mt-2">Welcome back, here's what's happening today.</p>
         </div>
         <div className="flex gap-3">
@@ -79,7 +79,7 @@ export function Dashboard() {
         <StatCard title="Active Conversations" value="124" change="+12.5%" icon={MessageSquare} trend="up" />
         <StatCard title="Open Deals" value="45" change="+5.2%" icon={TrendingUp} trend="up" />
         <StatCard title="Automation Rate" value="98.2%" change="-0.4%" icon={CheckCircle2} trend="down" />
-        <StatCard title="Avg. Response Time" value="2m 14s" change="+18.2%" icon={Clock} trend="up" />
+        <StatCard title={t('dashboard.avg_response_time')} value="2m 14s" change="+18.2%" icon={Clock} trend="up" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

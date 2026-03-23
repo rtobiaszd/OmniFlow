@@ -13,6 +13,7 @@ interface AuthContextType {
   login: () => Promise<void>;
   logout: () => Promise<void>;
   isConfigured: boolean;
+  error: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -20,6 +21,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isFirebaseConfigured || !auth) {
@@ -36,10 +38,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async () => {
     if (!auth) return;
+    setError(null);
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (error) {
-      console.error('Login error:', error);
+    } catch (err: any) {
+      console.error('Login error:', err);
+      if (err.code === 'auth/configuration-not-found') {
+        setError('Google Auth is not enabled in your Firebase Console. Please enable it in Authentication > Sign-in method.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        const currentDomain = window.location.hostname;
+        setError(`This domain (${currentDomain}) is not authorized in your Firebase Console. Please add it in Authentication > Settings > Authorized domains.`);
+      } else {
+        setError(err.message || 'An error occurred during login.');
+      }
     }
   };
 
@@ -53,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isConfigured: isFirebaseConfigured }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, isConfigured: isFirebaseConfigured, error }}>
       {!loading && children}
     </AuthContext.Provider>
   );

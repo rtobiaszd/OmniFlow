@@ -5,6 +5,7 @@ import { EventController } from "../controllers/event.controller";
 import { StatsController } from "../controllers/stats.controller";
 import { WorkflowController } from "../controllers/workflow.controller";
 import { IntegrationController } from "../controllers/integration.controller";
+import { AuthController } from "../controllers/auth.controller";
 
 const router = Router();
 
@@ -15,6 +16,10 @@ const eventController = new EventController();
 const statsController = new StatsController();
 const workflowController = new WorkflowController();
 const integrationController = new IntegrationController();
+const authController = new AuthController();
+
+// Auth
+router.get("/auth/url", (req, res) => authController.getAuthUrl(req, res));
 
 // Stats
 router.get("/dashboard/stats", (req, res) => statsController.getDashboardStats(req, res));

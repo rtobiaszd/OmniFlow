@@ -11,26 +11,29 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
-  Bell
+  Bell,
+  Languages
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
-
-const navItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
-  { icon: Inbox, label: 'Inbox', path: '/inbox' },
-  { icon: GitBranch, label: 'Pipelines', path: '/pipelines' },
-  { icon: Zap, label: 'Workflows', path: '/workflows' },
-  { icon: Plug, label: 'Integrations', path: '/integrations' },
-  { icon: Users, label: 'Contacts', path: '/contacts' },
-  { icon: Calendar, label: 'Calendar', path: '/calendar' },
-];
+import { useTranslation } from 'react-i18next';
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = React.useState(false);
   const location = useLocation();
   const { logout } = useAuth();
+  const { t } = useTranslation();
+
+  const navItems = [
+    { icon: LayoutDashboard, label: t('common.dashboard'), path: '/' },
+    { icon: Inbox, label: t('common.inbox'), path: '/inbox' },
+    { icon: GitBranch, label: t('common.pipelines'), path: '/pipelines' },
+    { icon: Zap, label: t('common.workflows'), path: '/workflows' },
+    { icon: Plug, label: t('common.integrations'), path: '/integrations' },
+    { icon: Users, label: t('common.contacts'), path: '/contacts' },
+    { icon: Calendar, label: t('common.calendar'), path: '/calendar' },
+  ];
 
   return (
     <div 
@@ -76,14 +79,14 @@ export function Sidebar() {
           className="flex items-center p-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-all"
         >
           <Settings size={20} />
-          {!collapsed && <span className="ml-3 font-medium">Settings</span>}
+          {!collapsed && <span className="ml-3 font-medium">{t('common.settings')}</span>}
         </Link>
         <button 
           onClick={logout}
           className="w-full flex items-center p-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all"
         >
           <LogOut size={20} />
-          {!collapsed && <span className="ml-3 font-medium">Logout</span>}
+          {!collapsed && <span className="ml-3 font-medium">{t('common.logout')}</span>}
         </button>
       </div>
     </div>
@@ -92,6 +95,11 @@ export function Sidebar() {
 
 export function Topbar() {
   const { user } = useAuth();
+  const { i18n } = useTranslation();
+
+  const changeLanguage = (lng: string) => {
+    i18n.changeLanguage(lng);
+  };
 
   return (
     <header className="h-16 border-b border-gray-200 bg-white flex items-center justify-between px-8">
@@ -104,6 +112,19 @@ export function Topbar() {
       </div>
 
       <div className="flex items-center gap-6">
+        <div className="flex items-center gap-2 pr-6 border-r border-gray-200">
+          <Languages size={18} className="text-gray-400" />
+          <select 
+            onChange={(e) => changeLanguage(e.target.value)}
+            value={i18n.language}
+            className="text-sm font-medium text-gray-600 bg-transparent focus:outline-none cursor-pointer"
+          >
+            <option value="en">English</option>
+            <option value="pt">Português</option>
+            <option value="es">Español</option>
+          </select>
+        </div>
+
         <button className="relative p-2 text-gray-400 hover:text-gray-600 transition-colors">
           <Bell size={20} />
           <span className="absolute top-2 right-2 h-2 w-2 bg-red-500 rounded-full border-2 border-white"></span>

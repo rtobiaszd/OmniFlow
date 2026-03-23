@@ -1,0 +1,139 @@
+{
+  "entities": {
+    "Tenant": {
+      "title": "Tenant",
+      "description": "Multi-tenant company information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "plan": { "type": "string", "enum": ["starter", "pro", "enterprise"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "plan"]
+    },
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user information and preferences",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string", "format": "uri" },
+        "role": { "type": "string", "enum": ["admin", "manager", "agent"] },
+        "tenantId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role", "tenantId"]
+    },
+    "Integration": {
+      "title": "Integration",
+      "description": "External service connection",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "provider": { "type": "string", "enum": ["whatsapp", "email", "telegram", "jira", "github"] },
+        "name": { "type": "string" },
+        "status": { "type": "string", "enum": ["connected", "disconnected", "error"] },
+        "config": { "type": "object" },
+        "tenantId": { "type": "string" }
+      },
+      "required": ["id", "provider", "name", "status", "tenantId"]
+    },
+    "Workflow": {
+      "title": "Workflow",
+      "description": "Automation workflow",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "active": { "type": "boolean" },
+        "nodes": { "type": "array" },
+        "tenantId": { "type": "string" }
+      },
+      "required": ["id", "name", "active", "tenantId"]
+    },
+    "Pipeline": {
+      "title": "Pipeline",
+      "description": "CRM Pipeline",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "stages": { "type": "array" },
+        "customFields": { "type": "array" },
+        "tenantId": { "type": "string" }
+      },
+      "required": ["id", "name", "tenantId"]
+    },
+    "Deal": {
+      "title": "Deal",
+      "description": "CRM Deal or Ticket",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "value": { "type": "number" },
+        "company": { "type": "string" },
+        "contactId": { "type": "string" },
+        "stageId": { "type": "string" },
+        "pipelineId": { "type": "string" },
+        "priority": { "type": "string", "enum": ["low", "medium", "high"] },
+        "status": { "type": "string", "enum": ["open", "won", "lost"] },
+        "customValues": { "type": "object" },
+        "assignedTo": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "stageId", "pipelineId", "tenantId"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Omnichannel message",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "conversationId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "contactId": { "type": "string" },
+        "content": { "type": "string" },
+        "channel": { "type": "string", "enum": ["whatsapp", "email", "telegram"] },
+        "tenantId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "content", "channel", "tenantId"]
+    }
+  },
+  "firestore": {
+    "/tenants/{tenantId}": {
+      "schema": "Tenant",
+      "description": "Tenant information"
+    },
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile documents"
+    },
+    "/integrations/{intId}": {
+      "schema": "Integration",
+      "description": "Service integrations"
+    },
+    "/workflows/{wfId}": {
+      "schema": "Workflow",
+      "description": "Automation workflows"
+    },
+    "/pipelines/{pipeId}": {
+      "schema": "Pipeline",
+      "description": "CRM pipelines"
+    },
+    "/deals/{dealId}": {
+      "schema": "Deal",
+      "description": "CRM deals"
+    },
+    "/messages/{msgId}": {
+      "schema": "Message",
+      "description": "Omnichannel messages"
+    }
+  }
+}

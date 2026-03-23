@@ -18,6 +18,7 @@ export interface Integration {
   name: string;
   status: 'connected' | 'disconnected' | 'error';
   config: Record<string, any>;
+  authUrl?: string;
 }
 
 export interface Workflow {

@@ -1,0 +1,32 @@
+{
+  "common": {
+    "dashboard": "Painel",
+    "inbox": "Caixa de Entrada",
+    "pipelines": "Pipelines",
+    "workflows": "Fluxos de Trabalho",
+    "integrations": "Integrações",
+    "contacts": "Contatos",
+    "calendar": "Calendário",
+    "settings": "Configurações",
+    "logout": "Sair",
+    "welcome": "Bem-vindo ao OmniFlow",
+    "signin_google": "Entrar com Google",
+    "auth_powered": "Autenticação segura via Firebase",
+    "setup_required": "Configuração Necessária",
+    "setup_desc": "Para proteger suas chaves, movi a configuração para variáveis de ambiente.",
+    "how_to_configure": "Como configurar:",
+    "step1": "Abra o menu **Settings** (engrenagem)",
+    "step2": "Vá em **Secrets** ou **Environment Variables**",
+    "step3": "Adicione **VITE_FIREBASE_API_KEY** e as outras chaves listadas no arquivo <code>.env.example</code>",
+    "step4": "Reinicie o servidor de desenvolvimento",
+    "security_note": "Isso garante que suas chaves não sejam expostas se você exportar para o GitHub."
+  },
+  "dashboard": {
+    "total_conversations": "Total de Conversas",
+    "active_bots": "Bots Ativos",
+    "avg_response_time": "Tempo Médio de Resposta",
+    "conversion_rate": "Taxa de Conversão",
+    "recent_activity": "Atividade Recente",
+    "view_all": "Ver Tudo"
+  }
+}

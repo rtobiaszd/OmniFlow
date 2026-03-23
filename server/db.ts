@@ -49,8 +49,22 @@ export const db = {
     }
   ] as Workflow[],
   integrations: [
-    { id: 'i1', provider: 'whatsapp', name: 'WhatsApp Business', status: 'connected', config: {} },
-    { id: 'i2', provider: 'jira', name: 'Jira Cloud', status: 'error', config: {} }
+    { 
+      id: 'i1', 
+      provider: 'whatsapp', 
+      name: 'WhatsApp Business', 
+      status: 'connected', 
+      config: {},
+      authUrl: process.env.OAUTH || "https://example.com/oauth/authorize"
+    },
+    { 
+      id: 'i2', 
+      provider: 'jira', 
+      name: 'Jira Cloud', 
+      status: 'error', 
+      config: {},
+      authUrl: process.env.OAUTH || "https://example.com/oauth/authorize"
+    }
   ] as Integration[],
   messages: [] as Message[],
   events: [] as any[]
