@@ -219,13 +219,20 @@ export function Workflows() {
   };
 
   const confirmDelete = async () => {
-    if (!deletingWfId) return;
+    if (!deletingWfId) {
+      console.warn('No workflow ID selected for deletion');
+      return;
+    }
+    
     setIsSubmitting(true);
     try {
+      console.log('Attempting to delete workflow:', deletingWfId);
       await workflowService.deleteWorkflow(deletingWfId);
+      console.log('Workflow deleted successfully');
       setDeletingWfId(null);
     } catch (error) {
       console.error('Error deleting workflow:', error);
+      // Show error to user if possible, for now just log it
     } finally {
       setIsSubmitting(false);
     }

@@ -27,6 +27,7 @@ export interface Workflow {
   name: string;
   description: string;
   active: boolean;
+  trigger?: 'message' | 'event' | 'time' | 'stage_change' | 'module_record_created';
   nodes: WorkflowNode[];
   edges?: any[]; // For node-based flow
   integrationId?: string;
@@ -36,7 +37,7 @@ export interface Workflow {
 
 export interface WorkflowNode {
   id: string;
-  type: 'trigger' | 'condition' | 'action' | 'ai' | 'delay' | 'webhook' | 'api' | 'google_sheets' | 'gmail' | 'slack_msg' | 'google_drive' | 'google_cloud' | 'schedule';
+  type: 'trigger' | 'condition' | 'action' | 'ai' | 'delay' | 'webhook' | 'api' | 'google_sheets' | 'gmail' | 'slack_msg' | 'google_drive' | 'google_cloud' | 'schedule' | 'module_record';
   data: Record<string, any>;
   position: { x: number; y: number };
 }
@@ -99,4 +100,32 @@ export interface WorkflowTemplate {
   niche: string;
   nodes: WorkflowNode[];
   edges?: any[];
+}
+
+export interface ModuleField {
+  id: string;
+  name: string;
+  type: 'text' | 'number' | 'date' | 'select' | 'relation' | 'boolean';
+  required: boolean;
+  options?: string[]; // For select
+  relationModuleId?: string; // For relation
+}
+
+export interface ModuleDefinition {
+  id: string;
+  tenantId: string;
+  name: string;
+  slug: string;
+  icon: string;
+  description: string;
+  fields: ModuleField[];
+  createdAt: string;
+}
+
+export interface ModuleRecord {
+  id: string;
+  moduleId: string;
+  tenantId: string;
+  data: Record<string, any>;
+  createdAt: string;
 }

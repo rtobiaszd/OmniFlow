@@ -19,14 +19,14 @@ export const workflowService = {
     if (!db) return [];
     const q = query(collection(db, COLLECTION), where('tenantId', '==', tenantId));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ ...doc.data() } as Workflow));
+    return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Workflow));
   },
 
   subscribeToWorkflows(tenantId: string, callback: (workflows: Workflow[]) => void) {
     if (!db) return () => {};
     const q = query(collection(db, COLLECTION), where('tenantId', '==', tenantId));
     return onSnapshot(q, (snapshot) => {
-      const workflows = snapshot.docs.map(doc => ({ ...doc.data() } as Workflow));
+      const workflows = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Workflow));
       callback(workflows);
     });
   },
@@ -58,7 +58,11 @@ export const workflowService = {
   },
 
   async deleteWorkflow(id: string) {
-    if (!db) return;
+    if (!db) {
+      console.error('Firestore database not initialized');
+      return;
+    }
+    console.log(`Deleting document ${id} from collection ${COLLECTION}`);
     await deleteDoc(doc(db, COLLECTION, id));
   },
 

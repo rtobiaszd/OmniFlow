@@ -32,8 +32,10 @@ import {
   Cloud,
   Slack
 } from 'lucide-react';
-import { Workflow, WorkflowNode } from '../types';
+import { Workflow, WorkflowNode, ModuleDefinition } from '../types';
 import { workflowService } from '../services/workflowService';
+import { moduleService } from '../services/moduleService';
+import { useAuth } from '../contexts/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
 
 const NODE_TYPES = {
@@ -50,6 +52,7 @@ const NODE_TYPES = {
   google_drive: { icon: Cloud, color: 'bg-blue-500', label: 'Google Drive' },
   google_cloud: { icon: Cloud, color: 'bg-indigo-600', label: 'Google Cloud' },
   schedule: { icon: Clock, color: 'bg-teal-500', label: 'Schedule' },
+  module_record: { icon: Database, color: 'bg-pink-500', label: 'Módulo Personalizado' },
 };
 
 interface WorkflowEditorProps {
@@ -58,10 +61,18 @@ interface WorkflowEditorProps {
 }
 
 export function WorkflowEditor({ workflow, onClose }: WorkflowEditorProps) {
+  const { profile } = useAuth();
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [isSaving, setIsSaving] = useState(false);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [customModules, setCustomModules] = useState<ModuleDefinition[]>([]);
+
+  useEffect(() => {
+    if (profile?.tenantId) {
+      moduleService.subscribeToModuleDefinitions(profile.tenantId, setCustomModules);
+    }
+  }, [profile?.tenantId]);
 
   const renderNodeLabel = (type: string, data: any) => (
     <div className="flex items-center gap-2 p-2">
@@ -452,6 +463,47 @@ export function WorkflowEditor({ workflow, onClose }: WorkflowEditorProps) {
                         value={(selectedNode.data.originalNode as WorkflowNode).data.payload || ''}
                         onChange={(e) => updateNodeData(selectedNode.id, { payload: e.target.value })}
                         placeholder='{"topic": "my-topic", "data": "..."}'
+                        className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all h-24 resize-none font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Custom Module Configuration */}
+                {(selectedNode.data.originalNode as WorkflowNode).type === 'module_record' && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Módulo</label>
+                      <select 
+                        value={(selectedNode.data.originalNode as WorkflowNode).data.moduleId || ''}
+                        onChange={(e) => updateNodeData(selectedNode.id, { moduleId: e.target.value })}
+                        className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                      >
+                        <option value="">Selecione um módulo...</option>
+                        {customModules.map(m => (
+                          <option key={m.id} value={m.id}>{m.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Ação</label>
+                      <select 
+                        value={(selectedNode.data.originalNode as WorkflowNode).data.action || 'CREATE'}
+                        onChange={(e) => updateNodeData(selectedNode.id, { action: e.target.value })}
+                        className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                      >
+                        <option value="CREATE">Criar Registro</option>
+                        <option value="UPDATE">Atualizar Registro</option>
+                        <option value="GET">Buscar Registro</option>
+                        <option value="DELETE">Excluir Registro</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Dados (JSON)</label>
+                      <textarea 
+                        value={(selectedNode.data.originalNode as WorkflowNode).data.recordData || ''}
+                        onChange={(e) => updateNodeData(selectedNode.id, { recordData: e.target.value })}
+                        placeholder='{"field_id": "value"}'
                         className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all h-24 resize-none font-mono text-xs"
                       />
                     </div>

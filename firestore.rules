@@ -71,25 +71,33 @@ service cloud.firestore {
     // Integrations
     match /integrations/{intId} {
       allow read: if belongsToTenant(resource.data);
-      allow write: if belongsToTenant(request.resource.data) && isAdmin();
+      allow create: if belongsToTenant(request.resource.data) && isAdmin();
+      allow update: if belongsToTenant(resource.data) && belongsToTenant(request.resource.data) && isAdmin();
+      allow delete: if belongsToTenant(resource.data) && isAdmin();
     }
 
     // Workflows
     match /workflows/{wfId} {
       allow read: if belongsToTenant(resource.data);
-      allow write: if belongsToTenant(request.resource.data);
+      allow create: if belongsToTenant(request.resource.data);
+      allow update: if belongsToTenant(resource.data) && belongsToTenant(request.resource.data);
+      allow delete: if belongsToTenant(resource.data);
     }
 
     // Pipelines
     match /pipelines/{pipeId} {
       allow read: if belongsToTenant(resource.data);
-      allow write: if belongsToTenant(request.resource.data) && isAdmin();
+      allow create: if belongsToTenant(request.resource.data) && isAdmin();
+      allow update: if belongsToTenant(resource.data) && belongsToTenant(request.resource.data) && isAdmin();
+      allow delete: if belongsToTenant(resource.data) && isAdmin();
     }
 
     // Deals
     match /deals/{dealId} {
       allow read: if belongsToTenant(resource.data);
-      allow write: if belongsToTenant(request.resource.data);
+      allow create: if belongsToTenant(request.resource.data);
+      allow update: if belongsToTenant(resource.data) && belongsToTenant(request.resource.data);
+      allow delete: if belongsToTenant(resource.data);
     }
 
     // Messages
@@ -97,6 +105,22 @@ service cloud.firestore {
       allow read: if belongsToTenant(resource.data);
       allow create: if belongsToTenant(request.resource.data);
       allow update, delete: if false; // Messages are immutable for now
+    }
+
+    // Module Definitions
+    match /module_definitions/{modId} {
+      allow read: if belongsToTenant(resource.data);
+      allow create: if belongsToTenant(request.resource.data) && isAdmin();
+      allow update: if belongsToTenant(resource.data) && belongsToTenant(request.resource.data) && isAdmin();
+      allow delete: if belongsToTenant(resource.data) && isAdmin();
+    }
+
+    // Module Records
+    match /module_records/{recId} {
+      allow read: if belongsToTenant(resource.data);
+      allow create: if belongsToTenant(request.resource.data);
+      allow update: if belongsToTenant(resource.data) && belongsToTenant(request.resource.data);
+      allow delete: if belongsToTenant(resource.data);
     }
 
     // Default Deny

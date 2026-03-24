@@ -12,6 +12,8 @@ import { Users } from './pages/Users';
 import { Contacts } from './pages/Contacts';
 import { Calendar } from './pages/Calendar';
 import { Settings } from './pages/Settings';
+import { Modules } from './pages/Modules';
+import { ModuleView } from './pages/ModuleView';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -73,6 +75,8 @@ export default function App() {
           <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
           <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
           <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
+          <Route path="/modules" element={<ProtectedRoute><Modules /></ProtectedRoute>} />
+          <Route path="/modules/:slug" element={<ProtectedRoute><ModuleView /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

@@ -13,19 +13,30 @@ import {
   LogOut,
   Bell,
   Languages,
-  UserCircle
+  UserCircle,
+  Package,
+  Layers
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { tenantService, Tenant } from '../services/tenantService';
+import { moduleService } from '../services/moduleService';
+import { ModuleDefinition } from '../types';
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = React.useState(false);
   const location = useLocation();
   const { logout, profile } = useAuth();
   const { t } = useTranslation();
+  const [customModules, setCustomModules] = React.useState<ModuleDefinition[]>([]);
+
+  React.useEffect(() => {
+    if (!profile?.tenantId) return;
+    const unsub = moduleService.subscribeToModuleDefinitions(profile.tenantId, setCustomModules);
+    return unsub;
+  }, [profile?.tenantId]);
 
   const navItems = [
     { icon: LayoutDashboard, label: t('common.dashboard'), path: '/' },
@@ -35,6 +46,7 @@ export function Sidebar() {
     { icon: Plug, label: t('common.integrations'), path: '/integrations' },
     { icon: UsersIcon, label: t('common.contacts'), path: '/contacts' },
     { icon: Calendar, label: t('common.calendar'), path: '/calendar' },
+    { icon: Layers, label: 'Módulos', path: '/modules' },
   ];
 
   // Add Team management for admins
@@ -75,6 +87,32 @@ export function Sidebar() {
             >
               <item.icon size={20} className={cn("shrink-0", isActive ? "" : "group-hover:scale-110 transition-transform")} />
               {!collapsed && <span className="ml-3 font-medium">{item.label}</span>}
+            </Link>
+          );
+        })}
+
+        {/* Custom Modules Section */}
+        {!collapsed && customModules.length > 0 && (
+          <div className="pt-4 pb-2 px-3">
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Personalizados</span>
+          </div>
+        )}
+        {customModules.map((mod) => {
+          const path = `/modules/${mod.slug}`;
+          const isActive = location.pathname === path;
+          return (
+            <Link
+              key={mod.id}
+              to={path}
+              className={cn(
+                "flex items-center p-3 rounded-lg transition-all group",
+                isActive 
+                  ? "bg-white text-[#151619]" 
+                  : "text-gray-400 hover:text-white hover:bg-white/5"
+              )}
+            >
+              <Package size={20} className={cn("shrink-0", isActive ? "" : "group-hover:scale-110 transition-transform")} />
+              {!collapsed && <span className="ml-3 font-medium">{mod.name}</span>}
             </Link>
           );
         })}
