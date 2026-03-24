@@ -30,6 +30,10 @@ const AVAILABLE_INTEGRATIONS = [
   { id: 'webhook', name: 'Webhook', provider: 'Generic', icon: 'W', color: 'bg-orange-600', description: 'Receive events from any service via webhooks.' },
   { id: 'api', name: 'Custom API', provider: 'Generic', icon: 'A', color: 'bg-indigo-600', description: 'Connect to any REST API with custom auth.' },
   { id: 'google_calendar', name: 'Google Calendar', provider: 'Google', icon: 'G', color: 'bg-blue-500', description: 'Sync your appointments with Google.' },
+  { id: 'google_sheets', name: 'Google Sheets', provider: 'Google', icon: 'S', color: 'bg-green-600', description: 'Automate your spreadsheets.' },
+  { id: 'gmail', name: 'Gmail', provider: 'Google', icon: 'M', color: 'bg-red-500', description: 'Send and receive emails automatically.' },
+  { id: 'google_drive', name: 'Google Drive', provider: 'Google', icon: 'D', color: 'bg-blue-600', description: 'Manage your files in the cloud.' },
+  { id: 'google_cloud', name: 'Google Cloud Platform', provider: 'Google', icon: 'C', color: 'bg-indigo-600', description: 'Connect to GCP services (Pub/Sub, Functions).' },
   { id: 'outlook_calendar', name: 'Outlook Calendar', provider: 'Microsoft', icon: 'O', color: 'bg-blue-600', description: 'Sync your appointments with Outlook.' },
 ];
 
@@ -132,6 +136,10 @@ export function Integrations() {
         fields.headerName = { label: 'Auth Header Name', type: 'text', placeholder: 'Authorization' };
         break;
       case 'google_calendar':
+      case 'google_sheets':
+      case 'gmail':
+      case 'google_drive':
+      case 'google_cloud':
       case 'outlook_calendar':
         fields.clientId = { label: 'Client ID', type: 'text', placeholder: 'OAuth Client ID' };
         fields.clientSecret = { label: 'Client Secret', type: 'password', placeholder: 'OAuth Client Secret' };
@@ -356,6 +364,33 @@ export function Integrations() {
           </div>
         )}
       </AnimatePresence>
+      {/* OAuth Help Section */}
+      <div className="mt-12 bg-indigo-50 rounded-3xl p-8 border border-indigo-100">
+        <div className="flex items-start gap-4">
+          <div className="p-3 bg-indigo-600 text-white rounded-2xl">
+            <Settings size={24} />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">How to get OAUTH_CLIENT_ID?</h3>
+            <p className="text-gray-600 mb-4 max-w-2xl">
+              To integrate Google services, you need to create an OAuth 2.0 Client ID in the Google Cloud Console.
+            </p>
+            <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600 mb-6">
+              <li>Go to the <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" className="text-indigo-600 font-bold hover:underline">Google Cloud Console</a>.</li>
+              <li>Create a new project or select an existing one.</li>
+              <li>Navigate to <strong>APIs & Services &gt; Credentials</strong>.</li>
+              <li>Click <strong>Create Credentials &gt; OAuth client ID</strong>.</li>
+              <li>Select <strong>Web application</strong> as the application type.</li>
+              <li>Add your App URL to <strong>Authorized redirect URIs</strong>: <code className="bg-white px-2 py-1 rounded border border-indigo-200 text-indigo-700 font-mono text-xs">https://ais-dev-hbdni5swbxpl4fqwqwlh22-384602049156.us-east1.run.app/auth/callback</code></li>
+              <li>Copy the <strong>Client ID</strong> and <strong>Client Secret</strong> and paste them above.</li>
+            </ol>
+            <div className="flex items-center gap-2 text-xs text-indigo-600 font-bold">
+              <AlertCircle size={14} />
+              <span>Make sure to enable the specific APIs (Gmail, Sheets, etc.) in the Library section.</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

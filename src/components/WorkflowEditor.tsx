@@ -26,7 +26,11 @@ import {
   Loader2,
   Plug,
   Database,
-  Trash2
+  Trash2,
+  FileText,
+  Mail,
+  Cloud,
+  Slack
 } from 'lucide-react';
 import { Workflow, WorkflowNode } from '../types';
 import { workflowService } from '../services/workflowService';
@@ -40,6 +44,12 @@ const NODE_TYPES = {
   condition: { icon: GitMerge, color: 'bg-indigo-500', label: 'Condition' },
   webhook: { icon: Plug, color: 'bg-green-500', label: 'Webhook' },
   api: { icon: Database, color: 'bg-gray-700', label: 'Generic API' },
+  google_sheets: { icon: FileText, color: 'bg-green-600', label: 'Google Sheets' },
+  gmail: { icon: Mail, color: 'bg-red-500', label: 'Gmail' },
+  slack_msg: { icon: Slack, color: 'bg-purple-600', label: 'Slack Message' },
+  google_drive: { icon: Cloud, color: 'bg-blue-500', label: 'Google Drive' },
+  google_cloud: { icon: Cloud, color: 'bg-indigo-600', label: 'Google Cloud' },
+  schedule: { icon: Clock, color: 'bg-teal-500', label: 'Schedule' },
 };
 
 interface WorkflowEditorProps {
@@ -328,6 +338,108 @@ export function WorkflowEditor({ workflow, onClose }: WorkflowEditorProps) {
                   </div>
                 )}
 
+                {/* Google Sheets Configuration */}
+                {(selectedNode.data.originalNode as WorkflowNode).type === 'google_sheets' && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Spreadsheet ID</label>
+                      <input 
+                        type="text"
+                        value={(selectedNode.data.originalNode as WorkflowNode).data.spreadsheetId || ''}
+                        onChange={(e) => updateNodeData(selectedNode.id, { spreadsheetId: e.target.value })}
+                        className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Action</label>
+                      <select 
+                        value={(selectedNode.data.originalNode as WorkflowNode).data.action || 'APPEND'}
+                        onChange={(e) => updateNodeData(selectedNode.id, { action: e.target.value })}
+                        className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                      >
+                        <option value="APPEND">Append Row</option>
+                        <option value="UPDATE">Update Row</option>
+                        <option value="GET">Get Row</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {/* Gmail Configuration */}
+                {(selectedNode.data.originalNode as WorkflowNode).type === 'gmail' && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">To</label>
+                      <input 
+                        type="email"
+                        value={(selectedNode.data.originalNode as WorkflowNode).data.to || ''}
+                        onChange={(e) => updateNodeData(selectedNode.id, { to: e.target.value })}
+                        className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Subject</label>
+                      <input 
+                        type="text"
+                        value={(selectedNode.data.originalNode as WorkflowNode).data.subject || ''}
+                        onChange={(e) => updateNodeData(selectedNode.id, { subject: e.target.value })}
+                        className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Slack Message Configuration */}
+                {(selectedNode.data.originalNode as WorkflowNode).type === 'slack_msg' && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Channel ID</label>
+                      <input 
+                        type="text"
+                        value={(selectedNode.data.originalNode as WorkflowNode).data.channelId || ''}
+                        onChange={(e) => updateNodeData(selectedNode.id, { channelId: e.target.value })}
+                        className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Message</label>
+                      <textarea 
+                        value={(selectedNode.data.originalNode as WorkflowNode).data.message || ''}
+                        onChange={(e) => updateNodeData(selectedNode.id, { message: e.target.value })}
+                        className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all h-24 resize-none"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Google Cloud Configuration */}
+                {(selectedNode.data.originalNode as WorkflowNode).type === 'google_cloud' && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Service</label>
+                      <select 
+                        value={(selectedNode.data.originalNode as WorkflowNode).data.service || 'PUBSUB'}
+                        onChange={(e) => updateNodeData(selectedNode.id, { service: e.target.value })}
+                        className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                      >
+                        <option value="PUBSUB">Pub/Sub</option>
+                        <option value="FUNCTIONS">Cloud Functions</option>
+                        <option value="STORAGE">Cloud Storage</option>
+                        <option value="BIGQUERY">BigQuery</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Action / Payload</label>
+                      <textarea 
+                        value={(selectedNode.data.originalNode as WorkflowNode).data.payload || ''}
+                        onChange={(e) => updateNodeData(selectedNode.id, { payload: e.target.value })}
+                        placeholder='{"topic": "my-topic", "data": "..."}'
+                        className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all h-24 resize-none font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 {/* Delay Configuration */}
                 {(selectedNode.data.originalNode as WorkflowNode).type === 'delay' && (
                   <div>
@@ -353,6 +465,34 @@ export function WorkflowEditor({ workflow, onClose }: WorkflowEditorProps) {
                       className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
                     />
                     <p className="text-[10px] text-gray-400 mt-2">Use JavaScript expressions to evaluate the condition.</p>
+                  </div>
+                )}
+
+                {/* Schedule Configuration */}
+                {(selectedNode.data.originalNode as WorkflowNode).type === 'schedule' && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Frequency</label>
+                      <select 
+                        value={(selectedNode.data.originalNode as WorkflowNode).data.frequency || 'DAILY'}
+                        onChange={(e) => updateNodeData(selectedNode.id, { frequency: e.target.value })}
+                        className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                      >
+                        <option value="HOURLY">Hourly</option>
+                        <option value="DAILY">Daily</option>
+                        <option value="WEEKLY">Weekly</option>
+                        <option value="MONTHLY">Monthly</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Time (HH:MM)</label>
+                      <input 
+                        type="time"
+                        value={(selectedNode.data.originalNode as WorkflowNode).data.time || '09:00'}
+                        onChange={(e) => updateNodeData(selectedNode.id, { time: e.target.value })}
+                        className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                      />
+                    </div>
                   </div>
                 )}
 

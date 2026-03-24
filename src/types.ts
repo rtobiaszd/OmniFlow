@@ -14,7 +14,7 @@ export interface User {
 
 export interface Integration {
   id: string;
-  provider: 'whatsapp' | 'email' | 'telegram' | 'jira' | 'github' | 'slack' | 'facebook' | 'instagram' | 'webhook' | 'api';
+  provider: 'whatsapp' | 'email' | 'telegram' | 'jira' | 'github' | 'slack' | 'facebook' | 'instagram' | 'webhook' | 'api' | 'google_sheets' | 'gmail' | 'google_drive' | 'google_calendar' | 'outlook_calendar' | 'google_cloud';
   name: string;
   status: 'connected' | 'disconnected' | 'error';
   config: Record<string, any>;
@@ -36,7 +36,7 @@ export interface Workflow {
 
 export interface WorkflowNode {
   id: string;
-  type: 'trigger' | 'condition' | 'action' | 'ai' | 'delay' | 'webhook' | 'api';
+  type: 'trigger' | 'condition' | 'action' | 'ai' | 'delay' | 'webhook' | 'api' | 'google_sheets' | 'gmail' | 'slack_msg' | 'google_drive' | 'google_cloud' | 'schedule';
   data: Record<string, any>;
   position: { x: number; y: number };
 }

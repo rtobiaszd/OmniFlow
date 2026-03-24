@@ -89,6 +89,42 @@ const WORKFLOW_TEMPLATES = [
       { id: '4', type: 'action' as const, data: { label: 'Enviar WhatsApp Recuperação' }, position: { x: 250, y: 300 } }
     ],
     edges: [{ id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3' }, { id: 'e3-4', source: '3', target: '4' }]
+  },
+  {
+    id: 'template-education',
+    name: 'Educação: Matrícula de Aluno',
+    description: 'Automatiza o processo de matrícula e envio de material didático.',
+    niche: 'Educação',
+    nodes: [
+      { id: '1', type: 'trigger' as const, data: { label: 'Nova Matrícula' }, position: { x: 250, y: 0 } },
+      { id: '2', type: 'action' as const, data: { label: 'Gerar Acesso Portal' }, position: { x: 250, y: 100 } },
+      { id: '3', type: 'action' as const, data: { label: 'Enviar Material PDF' }, position: { x: 250, y: 200 } }
+    ],
+    edges: [{ id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3' }]
+  },
+  {
+    id: 'template-health',
+    name: 'Saúde: Lembrete de Consulta',
+    description: 'Envia lembretes via WhatsApp 24h antes da consulta médica.',
+    niche: 'Saúde',
+    nodes: [
+      { id: '1', type: 'trigger' as const, data: { label: 'Consulta Agendada' }, position: { x: 250, y: 0 } },
+      { id: '2', type: 'delay' as const, data: { label: 'Aguardar T-24h' }, position: { x: 250, y: 100 } },
+      { id: '3', type: 'action' as const, data: { label: 'Confirmar Presença' }, position: { x: 250, y: 200 } }
+    ],
+    edges: [{ id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3' }]
+  },
+  {
+    id: 'template-logistics',
+    name: 'Logística: Rastreio de Pedido',
+    description: 'Notifica o cliente sobre cada mudança no status da entrega.',
+    niche: 'Logística',
+    nodes: [
+      { id: '1', type: 'trigger' as const, data: { label: 'Status Alterado' }, position: { x: 250, y: 0 } },
+      { id: '2', type: 'condition' as const, data: { label: 'Em Rota?' }, position: { x: 250, y: 100 } },
+      { id: '3', type: 'action' as const, data: { label: 'Enviar SMS Rastreio' }, position: { x: 250, y: 200 } }
+    ],
+    edges: [{ id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3' }]
   }
 ];
 
