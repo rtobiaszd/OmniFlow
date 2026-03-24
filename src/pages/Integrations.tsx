@@ -115,10 +115,10 @@ export function Integrations() {
         fields.accessToken = { label: 'Access Token', type: 'password', placeholder: 'EAAB...' };
         break;
       case 'email':
-        fields.host = { label: 'SMTP Host', type: 'text', placeholder: 'smtp.gmail.com' };
-        fields.port = { label: 'Port', type: 'number', placeholder: '587' };
-        fields.user = { label: 'Username', type: 'text', placeholder: 'user@example.com' };
-        fields.pass = { label: 'Password', type: 'password', placeholder: 'App Password' };
+        fields.imapHost = { label: 'IMAP Host (Receiving)', type: 'text', placeholder: 'imap.gmail.com' };
+        fields.smtpHost = { label: 'SMTP Host (Sending)', type: 'text', placeholder: 'smtp.gmail.com' };
+        fields.user = { label: 'Email / Username', type: 'text', placeholder: 'user@example.com' };
+        fields.pass = { label: 'App Password', type: 'password', placeholder: 'xxxx xxxx xxxx xxxx' };
         break;
       case 'telegram':
         fields.botToken = { label: 'Bot Token', type: 'password', placeholder: '123456:ABC-DEF...' };

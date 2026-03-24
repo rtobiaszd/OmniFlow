@@ -1,13 +1,16 @@
-import { db } from "../db";
+import { adminDb } from "../lib/firebase-admin";
 import { Integration } from "../../src/types";
-import { IIntegrationRepository } from "../interfaces/repository.interface";
 
-export class IntegrationRepository implements IIntegrationRepository {
+export class IntegrationRepository {
+  private collection = adminDb.collection("integrations");
+
   async findAll(): Promise<Integration[]> {
-    return db.integrations;
+    const snapshot = await this.collection.get();
+    return snapshot.docs.map(doc => ({ ...doc.data() } as Integration));
   }
 
   async findById(id: string): Promise<Integration | undefined> {
-    return db.integrations.find(i => i.id === id);
+    const doc = await this.collection.doc(id).get();
+    return doc.exists ? (doc.data() as Integration) : undefined;
   }
 }

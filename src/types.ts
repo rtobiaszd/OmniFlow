@@ -37,7 +37,7 @@ export interface Workflow {
 
 export interface WorkflowNode {
   id: string;
-  type: 'trigger' | 'condition' | 'action' | 'ai' | 'delay' | 'webhook' | 'api' | 'google_sheets' | 'gmail' | 'slack_msg' | 'google_drive' | 'google_cloud' | 'schedule' | 'module_record';
+  type: 'trigger' | 'condition' | 'action' | 'ai' | 'delay' | 'webhook' | 'api' | 'google_sheets' | 'gmail' | 'slack_msg' | 'google_drive' | 'google_cloud' | 'schedule' | 'module_record' | 'email_trigger' | 'email_action' | 'email_read';
   data: Record<string, any>;
   position: { x: number; y: number };
 }

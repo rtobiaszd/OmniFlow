@@ -1,42 +1,43 @@
-import { db } from "../db";
+import { adminDb } from "../lib/firebase-admin";
 import { Workflow } from "../../src/types";
-import { IWorkflowRepository } from "../interfaces/repository.interface";
 
-export class WorkflowRepository implements IWorkflowRepository {
+export class WorkflowRepository {
+  private collection = adminDb.collection("workflows");
+
   async findAll(): Promise<Workflow[]> {
-    return db.workflows;
+    const snapshot = await this.collection.get();
+    return snapshot.docs.map(doc => ({ ...doc.data() } as Workflow));
   }
 
   async findById(id: string): Promise<Workflow | undefined> {
-    return db.workflows.find(w => w.id === id);
+    const doc = await this.collection.doc(id).get();
+    return doc.exists ? (doc.data() as Workflow) : undefined;
   }
 
   async findActiveByTrigger(event: string): Promise<Workflow[]> {
-    return db.workflows.filter(w => 
-      w.active && w.nodes.some(n => n.type === 'trigger' && n.data.event === event)
+    const snapshot = await this.collection.where("active", "==", true).get();
+    const workflows = snapshot.docs.map(doc => ({ ...doc.data() } as Workflow));
+    
+    return workflows.filter(w => 
+      w.nodes.some(n => 
+        (n.type === 'trigger' && n.data.event === event) ||
+        (n.type === 'email_trigger' && event === 'email_received')
+      )
     );
   }
 
   async create(workflow: Workflow): Promise<Workflow> {
-    db.workflows.push(workflow);
+    await this.collection.doc(workflow.id).set(workflow);
     return workflow;
   }
 
   async update(id: string, data: Partial<Workflow>): Promise<Workflow | undefined> {
-    const index = db.workflows.findIndex(w => w.id === id);
-    if (index !== -1) {
-      db.workflows[index] = { ...db.workflows[index], ...data };
-      return db.workflows[index];
-    }
-    return undefined;
+    await this.collection.doc(id).update(data);
+    return this.findById(id);
   }
 
   async delete(id: string): Promise<boolean> {
-    const index = db.workflows.findIndex(w => w.id === id);
-    if (index !== -1) {
-      db.workflows.splice(index, 1);
-      return true;
-    }
-    return false;
+    await this.collection.doc(id).delete();
+    return true;
   }
 }
