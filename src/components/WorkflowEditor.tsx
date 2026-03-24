@@ -351,6 +351,15 @@ export function WorkflowEditor({ workflow, onClose }: WorkflowEditorProps) {
                       />
                     </div>
                     <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Sheet Name</label>
+                      <input 
+                        type="text"
+                        value={(selectedNode.data.originalNode as WorkflowNode).data.sheetName || 'Sheet1'}
+                        onChange={(e) => updateNodeData(selectedNode.id, { sheetName: e.target.value })}
+                        className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                      />
+                    </div>
+                    <div>
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Action</label>
                       <select 
                         value={(selectedNode.data.originalNode as WorkflowNode).data.action || 'APPEND'}
@@ -360,6 +369,7 @@ export function WorkflowEditor({ workflow, onClose }: WorkflowEditorProps) {
                         <option value="APPEND">Append Row</option>
                         <option value="UPDATE">Update Row</option>
                         <option value="GET">Get Row</option>
+                        <option value="CLEAR">Clear Sheet</option>
                       </select>
                     </div>
                   </div>
@@ -384,6 +394,14 @@ export function WorkflowEditor({ workflow, onClose }: WorkflowEditorProps) {
                         value={(selectedNode.data.originalNode as WorkflowNode).data.subject || ''}
                         onChange={(e) => updateNodeData(selectedNode.id, { subject: e.target.value })}
                         className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Body</label>
+                      <textarea 
+                        value={(selectedNode.data.originalNode as WorkflowNode).data.body || ''}
+                        onChange={(e) => updateNodeData(selectedNode.id, { body: e.target.value })}
+                        className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all h-32 resize-none"
                       />
                     </div>
                   </div>

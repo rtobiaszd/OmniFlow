@@ -33,6 +33,10 @@ export function Pipelines() {
   const [isAddingDeal, setIsAddingDeal] = useState(false);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingPipelineId, setDeletingPipelineId] = useState<string | null>(null);
+  const [deletingDealId, setDeletingDealId] = useState<string | null>(null);
+  const [deletingStageId, setDeletingStageId] = useState<string | null>(null);
+  const [deletingFieldId, setDeletingFieldId] = useState<string | null>(null);
 
   const [newPipelineName, setNewPipelineName] = useState('');
   const [newStageName, setNewStageName] = useState('');
@@ -129,13 +133,79 @@ export function Pipelines() {
     }
   };
 
-  const handleDeletePipeline = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this pipeline? All stages and deals will be lost.')) return;
+  const handleDeletePipeline = (id: string) => {
+    setDeletingPipelineId(id);
+  };
+
+  const confirmDeletePipeline = async () => {
+    if (!deletingPipelineId) return;
+    setIsSubmitting(true);
     try {
-      await pipelineService.deletePipeline(id);
-      if (activePipelineId === id) setActivePipelineId(null);
+      await pipelineService.deletePipeline(deletingPipelineId);
+      if (activePipelineId === deletingPipelineId) setActivePipelineId(null);
+      setDeletingPipelineId(null);
     } catch (error) {
       console.error('Error deleting pipeline:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteDeal = (id: string) => {
+    setDeletingDealId(id);
+  };
+
+  const confirmDeleteDeal = async () => {
+    if (!deletingDealId) return;
+    setIsSubmitting(true);
+    try {
+      await pipelineService.deleteDeal(deletingDealId);
+      setDeletingDealId(null);
+      setEditingDeal(null);
+    } catch (error) {
+      console.error('Error deleting deal:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteStage = (stageId: string) => {
+    setDeletingStageId(stageId);
+  };
+
+  const confirmDeleteStage = async () => {
+    if (!deletingStageId || !activePipeline) return;
+    setIsSubmitting(true);
+    try {
+      await pipelineService.updatePipeline({
+        id: activePipeline.id,
+        stages: activePipeline.stages.filter(s => s.id !== deletingStageId)
+      });
+      setDeletingStageId(null);
+    } catch (error) {
+      console.error('Error deleting stage:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteField = (fieldId: string) => {
+    setDeletingFieldId(fieldId);
+  };
+
+  const confirmDeleteField = async () => {
+    if (!deletingFieldId || !activePipeline) return;
+    setIsSubmitting(true);
+    try {
+      await pipelineService.updatePipeline({
+        id: activePipeline.id,
+        customFields: activePipeline.customFields.filter(f => f.id !== deletingFieldId)
+      });
+      setDeletingFieldId(null);
+    } catch (error) {
+      console.error('Error deleting field:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -166,13 +236,17 @@ export function Pipelines() {
     if (!newFieldName || !activePipeline) return;
     setIsSubmitting(true);
     try {
-      const newField: CustomField = {
+      const newField: any = {
         id: `field_${Date.now()}`,
         name: newFieldName,
         type: newFieldType,
-        required: newFieldRequired,
-        options: newFieldType === 'select' ? newFieldOptions.split(',').map(o => o.trim()).filter(o => o) : undefined
+        required: newFieldRequired
       };
+      
+      if (newFieldType === 'select') {
+        newField.options = newFieldOptions.split(',').map(o => o.trim()).filter(o => o);
+      }
+
       await pipelineService.updatePipeline({
         id: activePipeline.id,
         customFields: [...(activePipeline.customFields || []), newField]
@@ -294,10 +368,18 @@ export function Pipelines() {
                   onClick={() => setEditingDeal(deal)}
                   className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer group"
                 >
-                  <div className="flex justify-between items-start mb-3">
-                    <h4 className="font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">{deal.title}</h4>
-                    <button className="text-gray-300 hover:text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity"><MoreHorizontal size={16} /></button>
-                  </div>
+                    <div className="flex justify-between items-start mb-3">
+                      <h4 className="font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">{deal.title}</h4>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleDeleteDeal(deal.id); }}
+                          className="p-1 text-gray-300 hover:text-red-600 transition-colors"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                        <button className="p-1 text-gray-300 hover:text-gray-500"><MoreHorizontal size={14} /></button>
+                      </div>
+                    </div>
                   <div className="text-xs text-gray-500 mb-4 flex items-center gap-1">
                     <User size={12} /> {deal.company}
                   </div>
@@ -620,24 +702,18 @@ export function Pipelines() {
               <div className="space-y-6">
                 <div className="space-y-3">
                   {activePipeline?.customFields?.map(f => (
-                    <div key={f.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
-                      <div>
-                        <div className="font-bold text-gray-900 text-sm">{f.name}</div>
-                        <div className="text-[10px] text-gray-400 uppercase font-bold">{f.type}</div>
-                      </div>
-                      <button 
-                        onClick={async () => {
-                          if (!activePipeline) return;
-                          await pipelineService.updatePipeline({
-                            id: activePipeline.id,
-                            customFields: activePipeline.customFields.filter(field => field.id !== f.id)
-                          });
-                        }}
-                        className="text-red-400 hover:text-red-600"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                  <div>
+                    <div className="font-bold text-gray-900 text-sm">{f.name}</div>
+                    <div className="text-[10px] text-gray-400 uppercase font-bold">{f.type}</div>
+                  </div>
+                  <button 
+                    onClick={() => handleDeleteField(f.id)}
+                    className="text-red-400 hover:text-red-600"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
                   ))}
                 </div>
 
@@ -696,6 +772,71 @@ export function Pipelines() {
             </motion.div>
           </div>
         )}
+        {/* Delete Confirmation Modal */}
+        <AnimatePresence>
+          {(deletingPipelineId || deletingDealId || deletingStageId || deletingFieldId) && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl"
+              >
+                <div className="flex items-center gap-4 text-red-600 mb-6">
+                  <div className="p-3 bg-red-50 rounded-2xl">
+                    <Trash2 size={24} />
+                  </div>
+                  <h3 className="text-xl font-bold">
+                    {deletingPipelineId ? 'Delete Pipeline?' : 
+                     deletingDealId ? 'Delete Deal?' : 
+                     deletingStageId ? 'Delete Stage?' : 
+                     'Delete Field?'}
+                  </h3>
+                </div>
+                
+                <p className="text-gray-600 mb-8">
+                  {deletingPipelineId ? 'Are you sure you want to delete this pipeline? All stages and deals will be lost.' : 
+                   deletingDealId ? 'Are you sure you want to delete this deal? This action cannot be undone.' : 
+                   deletingStageId ? 'Are you sure you want to delete this stage? All deals in this stage will be moved or lost.' : 
+                   'Are you sure you want to delete this custom field? All data for this field across all deals will be lost.'}
+                </p>
+
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => {
+                      setDeletingPipelineId(null);
+                      setDeletingDealId(null);
+                      setDeletingStageId(null);
+                      setDeletingFieldId(null);
+                    }}
+                    className="flex-1 py-3 bg-gray-50 text-gray-600 rounded-xl font-bold hover:bg-gray-100 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if (deletingPipelineId) confirmDeletePipeline();
+                      else if (deletingDealId) confirmDeleteDeal();
+                      else if (deletingStageId) confirmDeleteStage();
+                      else if (deletingFieldId) confirmDeleteField();
+                    }}
+                    disabled={isSubmitting}
+                    className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all flex items-center justify-center gap-2"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin" />
+                        Deleting...
+                      </>
+                    ) : (
+                      'Delete Now'
+                    )}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </AnimatePresence>
     </div>
   );

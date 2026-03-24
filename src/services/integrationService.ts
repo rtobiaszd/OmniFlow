@@ -35,7 +35,11 @@ export const integrationService = {
   async updateIntegration(integration: Partial<Integration> & { id: string }) {
     if (!db) return;
     const docRef = doc(db, COLLECTION, integration.id);
-    await updateDoc(docRef, integration);
+    // Remove undefined values to prevent Firestore errors
+    const cleanData = Object.fromEntries(
+      Object.entries(integration).filter(([_, v]) => v !== undefined)
+    );
+    await updateDoc(docRef, cleanData);
   },
 
   async connectIntegration(tenantId: string, provider: Integration['provider'], name: string, config: Record<string, any> = {}) {

@@ -50,7 +50,11 @@ export const workflowService = {
     if (!db) return;
     const docRef = doc(db, COLLECTION, workflow.id);
     const { id, ...data } = workflow;
-    await updateDoc(docRef, data);
+    // Remove undefined values to prevent Firestore errors
+    const cleanData = Object.fromEntries(
+      Object.entries(data).filter(([_, v]) => v !== undefined)
+    );
+    await updateDoc(docRef, cleanData);
   },
 
   async deleteWorkflow(id: string) {

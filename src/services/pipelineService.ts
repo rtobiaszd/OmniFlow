@@ -53,7 +53,11 @@ export const pipelineService = {
   async updatePipeline(pipeline: Partial<Pipeline> & { id: string }) {
     if (!db) return;
     const docRef = doc(db, PIPELINES_COLLECTION, pipeline.id);
-    await updateDoc(docRef, pipeline);
+    // Remove undefined values to prevent Firestore errors
+    const cleanData = Object.fromEntries(
+      Object.entries(pipeline).filter(([_, v]) => v !== undefined)
+    );
+    await updateDoc(docRef, cleanData);
   },
 
   async deletePipeline(id: string) {
@@ -88,6 +92,15 @@ export const pipelineService = {
   async updateDeal(deal: Partial<Deal> & { id: string }) {
     if (!db) return;
     const docRef = doc(db, DEALS_COLLECTION, deal.id);
-    await updateDoc(docRef, deal);
+    // Remove undefined values to prevent Firestore errors
+    const cleanData = Object.fromEntries(
+      Object.entries(deal).filter(([_, v]) => v !== undefined)
+    );
+    await updateDoc(docRef, cleanData);
+  },
+
+  async deleteDeal(id: string) {
+    if (!db) return;
+    await deleteDoc(doc(db, DEALS_COLLECTION, id));
   }
 };

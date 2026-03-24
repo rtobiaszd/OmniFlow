@@ -43,6 +43,7 @@ export function Users() {
   const [isInviting, setIsInviting] = useState(false);
   const [inviteData, setInviteData] = useState({ displayName: '', email: '', role: 'agent' as const });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,12 +71,20 @@ export function Users() {
     }
   };
 
-  const handleDeleteUser = async (uid: string) => {
-    if (!db || !confirm('Tem certeza que deseja remover este usuário?')) return;
+  const handleDeleteUser = (uid: string) => {
+    setDeletingUserId(uid);
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!db || !deletingUserId) return;
+    setIsSubmitting(true);
     try {
-      await deleteDoc(doc(db, 'users', uid));
+      await deleteDoc(doc(db, 'users', deletingUserId));
+      setDeletingUserId(null);
     } catch (error) {
       console.error('Error deleting user:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -158,6 +167,54 @@ export function Users() {
                   {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : 'Enviar Convite'}
                 </button>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {deletingUserId && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl"
+            >
+              <div className="flex items-center gap-4 text-red-600 mb-6">
+                <div className="p-3 bg-red-50 rounded-2xl">
+                  <Trash2 size={24} />
+                </div>
+                <h3 className="text-xl font-bold">Remover Usuário?</h3>
+              </div>
+              
+              <p className="text-gray-600 mb-8">
+                Tem certeza que deseja remover este usuário? Ele perderá acesso imediato à plataforma.
+              </p>
+
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setDeletingUserId(null)}
+                  className="flex-1 py-3 bg-gray-50 text-gray-600 rounded-xl font-bold hover:bg-gray-100 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={confirmDeleteUser}
+                  disabled={isSubmitting}
+                  className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Removendo...
+                    </>
+                  ) : (
+                    'Remover Agora'
+                  )}
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

@@ -139,6 +139,7 @@ export function Workflows() {
   const [visualEditingWf, setVisualEditingWf] = useState<Workflow | null>(null);
   const [newWf, setNewWf] = useState({ name: '', description: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingWfId, setDeletingWfId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!profile?.tenantId) return;
@@ -213,12 +214,20 @@ export function Workflows() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this workflow?')) return;
+  const handleDelete = (id: string) => {
+    setDeletingWfId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingWfId) return;
+    setIsSubmitting(true);
     try {
-      await workflowService.deleteWorkflow(id);
+      await workflowService.deleteWorkflow(deletingWfId);
+      setDeletingWfId(null);
     } catch (error) {
       console.error('Error deleting workflow:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -525,6 +534,54 @@ export function Workflows() {
                   )}
                 </button>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {deletingWfId && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl"
+            >
+              <div className="flex items-center gap-4 text-red-600 mb-6">
+                <div className="p-3 bg-red-50 rounded-2xl">
+                  <Trash2 size={24} />
+                </div>
+                <h3 className="text-xl font-bold">Delete Workflow?</h3>
+              </div>
+              
+              <p className="text-gray-600 mb-8">
+                Are you sure you want to delete this workflow? This action cannot be undone and all automation logic will be lost.
+              </p>
+
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setDeletingWfId(null)}
+                  className="flex-1 py-3 bg-gray-50 text-gray-600 rounded-xl font-bold hover:bg-gray-100 transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={confirmDelete}
+                  disabled={isSubmitting}
+                  className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    'Delete Now'
+                  )}
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

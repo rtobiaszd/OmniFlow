@@ -45,6 +45,7 @@ export function Integrations() {
   const [connectingInt, setConnectingInt] = useState<typeof AVAILABLE_INTEGRATIONS[0] | null>(null);
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!profile?.tenantId) return;
@@ -78,12 +79,20 @@ export function Integrations() {
     }
   };
 
-  const handleDisconnect = async (id: string) => {
-    if (!confirm('Are you sure you want to disconnect this integration? All credentials will be removed.')) return;
+  const handleDisconnect = (id: string) => {
+    setDisconnectingId(id);
+  };
+
+  const confirmDisconnect = async () => {
+    if (!disconnectingId) return;
+    setIsSubmitting(true);
     try {
-      await integrationService.disconnectIntegration(id);
+      await integrationService.disconnectIntegration(disconnectingId);
+      setDisconnectingId(null);
     } catch (error) {
       console.error('Error disconnecting:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -163,7 +172,8 @@ export function Integrations() {
 
   const filteredIntegrations = AVAILABLE_INTEGRATIONS.filter(int => 
     int.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    int.provider.toLowerCase().includes(searchTerm.toLowerCase())
+    int.provider.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    int.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -225,7 +235,7 @@ export function Integrations() {
             <Loader2 className="h-10 w-10 animate-spin mb-4" />
             <p>Loading integrations...</p>
           </div>
-        ) : (
+        ) : filteredIntegrations.length > 0 ? (
           filteredIntegrations.map((int) => {
             const connected = connectedIntegrations.find(c => c.provider === int.id);
             const isConnecting = connectingInt?.id === int.id;
@@ -234,6 +244,8 @@ export function Integrations() {
               <motion.div 
                 key={int.id} 
                 layout
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
                 className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group relative overflow-hidden"
               >
                 <div className="flex justify-between items-start mb-6">
@@ -300,6 +312,14 @@ export function Integrations() {
               </motion.div>
             );
           })
+        ) : (
+          <div className="col-span-full py-20 text-center bg-gray-50 rounded-[32px] border-2 border-dashed border-gray-200">
+            <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
+              <Search className="text-gray-300" size={32} />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900">No integrations found</h3>
+            <p className="text-gray-500 mt-1">Try searching for something else or request a new integration below.</p>
+          </div>
         )}
         
         <button className="border-2 border-dashed border-gray-200 rounded-3xl p-6 flex flex-col items-center justify-center gap-4 text-gray-400 hover:border-indigo-300 hover:text-indigo-500 transition-all group">
@@ -312,6 +332,54 @@ export function Integrations() {
           </div>
         </button>
       </div>
+
+      {/* Disconnect Confirmation Modal */}
+      <AnimatePresence>
+        {disconnectingId && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl"
+            >
+              <div className="flex items-center gap-4 text-red-600 mb-6">
+                <div className="p-3 bg-red-50 rounded-2xl">
+                  <Trash2 size={24} />
+                </div>
+                <h3 className="text-xl font-bold">Disconnect?</h3>
+              </div>
+              
+              <p className="text-gray-600 mb-8">
+                Are you sure you want to disconnect this integration? All credentials will be removed and automations using this service will stop working.
+              </p>
+
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setDisconnectingId(null)}
+                  className="flex-1 py-3 bg-gray-50 text-gray-600 rounded-xl font-bold hover:bg-gray-100 transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={confirmDisconnect}
+                  disabled={isSubmitting}
+                  className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Disconnecting...
+                    </>
+                  ) : (
+                    'Disconnect Now'
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Connection Modal */}
       <AnimatePresence>

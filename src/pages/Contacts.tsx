@@ -11,6 +11,7 @@ export function Contacts() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingContactId, setDeletingContactId] = useState<string | null>(null);
   const [newContact, setNewContact] = useState({
     name: '',
     email: '',
@@ -52,12 +53,20 @@ export function Contacts() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir este contato?')) return;
+  const handleDelete = (id: string) => {
+    setDeletingContactId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingContactId) return;
+    setIsSubmitting(true);
     try {
-      await contactService.deleteContact(id);
+      await contactService.deleteContact(deletingContactId);
+      setDeletingContactId(null);
     } catch (error) {
       console.error('Error deleting contact:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -276,6 +285,54 @@ export function Contacts() {
                   )}
                 </button>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {deletingContactId && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl"
+            >
+              <div className="flex items-center gap-4 text-red-600 mb-6">
+                <div className="p-3 bg-red-50 rounded-2xl">
+                  <Trash2 size={24} />
+                </div>
+                <h3 className="text-xl font-bold">Excluir Contato?</h3>
+              </div>
+              
+              <p className="text-gray-600 mb-8">
+                Tem certeza que deseja excluir este contato? Esta ação não pode ser desfeita.
+              </p>
+
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setDeletingContactId(null)}
+                  className="flex-1 py-3 bg-gray-50 text-gray-600 rounded-xl font-bold hover:bg-gray-100 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={confirmDelete}
+                  disabled={isSubmitting}
+                  className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Excluindo...
+                    </>
+                  ) : (
+                    'Excluir Agora'
+                  )}
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
