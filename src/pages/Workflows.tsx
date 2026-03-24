@@ -15,7 +15,8 @@ import {
   Loader2,
   Plug,
   Layout,
-  ChevronRight
+  ChevronRight,
+  ChevronLeft
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -140,6 +141,8 @@ export function Workflows() {
   const [newWf, setNewWf] = useState({ name: '', description: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingWfId, setDeletingWfId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
     if (!profile?.tenantId) return;
@@ -147,6 +150,12 @@ export function Workflows() {
     const unsubWorkflows = workflowService.subscribeToWorkflows(profile.tenantId, (data) => {
       setWorkflows(data);
       setLoading(false);
+      // Reset to page 1 if current page is now out of bounds
+      setCurrentPage(prev => {
+        const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE);
+        if (prev > totalPages && totalPages > 0) return totalPages;
+        return prev;
+      });
     });
 
     const unsubIntegrations = integrationService.subscribeToIntegrations(profile.tenantId, (data) => {
@@ -246,6 +255,12 @@ export function Workflows() {
     }
   };
 
+  const totalPages = Math.ceil(workflows.length / ITEMS_PER_PAGE);
+  const paginatedWorkflows = workflows.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
   return (
     <div className="p-8 space-y-8 max-w-7xl mx-auto">
       <div className="flex justify-between items-end">
@@ -312,82 +327,121 @@ export function Workflows() {
             <p className="text-sm">Create your first automation to get started.</p>
           </div>
         ) : (
-          workflows.map((wf) => (
-            <motion.div 
-              layout
-              key={wf.id} 
-              className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group"
-            >
-              <div className="flex justify-between items-start mb-6">
-                <div className={cn(
-                  "p-4 rounded-2xl",
-                  wf.active ? "bg-indigo-50 text-indigo-600" : "bg-gray-50 text-gray-400"
-                )}>
-                  <Zap size={32} />
+          <>
+            {paginatedWorkflows.map((wf) => (
+              <motion.div 
+                layout
+                key={wf.id} 
+                className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group"
+              >
+                <div className="flex justify-between items-start mb-6">
+                  <div className={cn(
+                    "p-4 rounded-2xl",
+                    wf.active ? "bg-indigo-50 text-indigo-600" : "bg-gray-50 text-gray-400"
+                  )}>
+                    <Zap size={32} />
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setEditingWf(wf)}
+                      className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                    >
+                      <Settings2 size={20} />
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(wf.id)}
+                      className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                    >
+                      <Trash2 size={20} />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => setEditingWf(wf)}
-                    className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
-                  >
-                    <Settings2 size={20} />
-                  </button>
-                  <button 
-                    onClick={() => handleDelete(wf.id)}
-                    className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
-                  >
-                    <Trash2 size={20} />
-                  </button>
-                </div>
-              </div>
 
-              <div className="mb-8">
-                <h3 className="text-xl font-bold text-gray-900 mb-2">{wf.name}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed">{wf.description}</p>
-                
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {wf.integrationId && (
-                    <div className="flex items-center gap-1.5 px-3 py-1 bg-green-50 text-green-600 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                      <Plug size={12} />
-                      {integrations.find(i => i.id === wf.integrationId)?.name || 'Integration'}
-                    </div>
-                  )}
-                  {wf.pipelineId && (
-                    <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                      <Layout size={12} />
-                      {pipelines.find(p => p.id === wf.pipelineId)?.name || 'Pipeline'}
-                    </div>
-                  )}
+                <div className="mb-8">
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">{wf.name}</h3>
+                  <p className="text-sm text-gray-500 leading-relaxed">{wf.description}</p>
+                  
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {wf.integrationId && (
+                      <div className="flex items-center gap-1.5 px-3 py-1 bg-green-50 text-green-600 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                        <Plug size={12} />
+                        {integrations.find(i => i.id === wf.integrationId)?.name || 'Integration'}
+                      </div>
+                    )}
+                    {wf.pipelineId && (
+                      <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                        <Layout size={12} />
+                        {pipelines.find(p => p.id === wf.pipelineId)?.name || 'Pipeline'}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex items-center justify-between pt-6 border-t border-gray-50">
-                <div className="flex gap-6">
-                  <div className="text-center">
-                    <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Nodes</div>
-                    <div className="text-lg font-bold text-gray-900">{wf.nodes?.length || 0}</div>
+                <div className="flex items-center justify-between pt-6 border-t border-gray-50">
+                  <div className="flex gap-6">
+                    <div className="text-center">
+                      <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Nodes</div>
+                      <div className="text-lg font-bold text-gray-900">{wf.nodes?.length || 0}</div>
+                    </div>
+                    <button 
+                      onClick={() => setVisualEditingWf(wf)}
+                      className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-sm font-bold hover:bg-indigo-100 transition-all flex items-center gap-2"
+                    >
+                      <GitMerge size={16} /> Edit Logic
+                    </button>
                   </div>
                   <button 
-                    onClick={() => setVisualEditingWf(wf)}
-                    className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-sm font-bold hover:bg-indigo-100 transition-all flex items-center gap-2"
+                    onClick={() => handleToggle(wf.id, wf.active)}
+                    className={cn(
+                      "px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all",
+                      wf.active 
+                        ? "bg-orange-50 text-orange-600 hover:bg-orange-100" 
+                        : "bg-green-50 text-green-600 hover:bg-green-100"
+                    )}
                   >
-                    <GitMerge size={16} /> Edit Logic
+                    {wf.active ? <><Pause size={16} /> Deactivate</> : <><Play size={16} /> Activate</>}
                   </button>
                 </div>
-                <button 
-                  onClick={() => handleToggle(wf.id, wf.active)}
-                  className={cn(
-                    "px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all",
-                    wf.active 
-                      ? "bg-orange-50 text-orange-600 hover:bg-orange-100" 
-                      : "bg-green-50 text-green-600 hover:bg-green-100"
-                  )}
+              </motion.div>
+            ))}
+
+            {totalPages > 1 && (
+              <div className="col-span-full flex items-center justify-center gap-2 mt-8">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 rounded-xl border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
-                  {wf.active ? <><Pause size={16} /> Deactivate</> : <><Play size={16} /> Activate</>}
+                  <ChevronLeft size={20} />
+                </button>
+                
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={cn(
+                        "w-10 h-10 rounded-xl text-sm font-bold transition-all",
+                        currentPage === page 
+                          ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200" 
+                          : "text-gray-500 hover:bg-gray-50"
+                      )}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="p-2 rounded-xl border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  <ChevronRight size={20} />
                 </button>
               </div>
-            </motion.div>
-          ))
+            )}
+          </>
         )}
       </div>
 

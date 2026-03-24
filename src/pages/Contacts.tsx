@@ -77,34 +77,34 @@ export function Contacts() {
   );
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
-      <div className="flex justify-between items-center mb-8">
+    <div className="space-y-6 lg:space-y-8 max-w-7xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Contatos</h1>
-          <p className="text-gray-500">Gerencie seus clientes e leads em um só lugar.</p>
+          <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">Contatos</h1>
+          <p className="text-gray-500 mt-1">Gerencie seus clientes e leads em um só lugar.</p>
         </div>
         <button 
           onClick={() => setIsCreating(true)}
-          className="flex items-center space-x-2 bg-indigo-600 text-white px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors shadow-sm"
+          className="w-full sm:w-auto flex items-center justify-center space-x-2 bg-indigo-600 text-white px-6 py-3 sm:py-2 rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200"
         >
           <UserPlus size={20} />
-          <span>Novo Contato</span>
+          <span className="font-semibold">Novo Contato</span>
         </button>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row gap-4">
+      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-4 lg:p-6 border-b border-gray-100 bg-gray-50/30 flex flex-col md:flex-row gap-4">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
             <input
               type="text"
               placeholder="Buscar contatos..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
             />
           </div>
-          <button className="flex items-center space-x-2 px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors text-gray-600">
+          <button className="flex items-center justify-center space-x-2 px-6 py-3 border border-gray-200 rounded-2xl hover:bg-gray-50 transition-all text-gray-600 font-medium">
             <Filter size={20} />
             <span>Filtros</span>
           </button>

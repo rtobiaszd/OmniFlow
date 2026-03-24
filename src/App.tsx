@@ -19,6 +19,12 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth();
   const location = useLocation();
+  const [sidebarOpen, setSidebarOpen] = React.useState(false);
+
+  // Close sidebar on route change on mobile
+  React.useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
 
   if (loading) {
     return (
@@ -48,11 +54,20 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-      <Sidebar />
+    <div className="flex h-screen bg-gray-50 overflow-hidden relative">
+      <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
+      
+      {/* Mobile Overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       <div className="flex-1 flex flex-col min-w-0">
-        <Topbar />
-        <main className="flex-1 overflow-y-auto">
+        <Topbar onMenuClick={() => setSidebarOpen(true)} />
+        <main className="flex-1 overflow-y-auto p-4 lg:p-8">
           {children}
         </main>
       </div>

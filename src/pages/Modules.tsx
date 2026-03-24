@@ -77,7 +77,7 @@ export function Modules() {
 
   const handleAddField = () => {
     const newField: ModuleField = {
-      id: `field_${Date.now()}`,
+      id: `field_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       name: '',
       type: 'text',
       required: false
@@ -140,29 +140,29 @@ export function Modules() {
   );
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+    <div className="space-y-6 lg:space-y-8 max-w-7xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Módulos Personalizados</h1>
+          <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">Módulos Personalizados</h1>
           <p className="text-gray-500 mt-1">Crie suas próprias tabelas, CRUDs e relatórios integrados.</p>
         </div>
         <button
           onClick={() => setIsAddingModule(true)}
-          className="flex items-center justify-center gap-2 bg-[#151619] text-white px-6 py-3 rounded-xl font-medium hover:bg-black transition-all shadow-lg shadow-black/10 active:scale-95"
+          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#151619] text-white px-6 py-3 rounded-xl font-medium hover:bg-black transition-all shadow-lg shadow-black/10 active:scale-95"
         >
           <Plus size={20} />
           Novo Módulo
         </button>
       </div>
 
-      <div className="relative mb-8">
+      <div className="relative">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
         <input
           type="text"
           placeholder="Buscar módulos..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-12 pr-4 py-4 bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black transition-all shadow-sm"
+          className="w-full pl-12 pr-4 py-3 lg:py-4 bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black transition-all shadow-sm"
         />
       </div>
 

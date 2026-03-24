@@ -59,17 +59,17 @@ export function Dashboard() {
   const { t } = useTranslation();
 
   return (
-    <div className="p-8 space-y-8 max-w-7xl mx-auto">
-      <div className="flex justify-between items-end">
+    <div className="space-y-6 lg:space-y-8 max-w-7xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4">
         <div>
-          <h1 className="text-4xl font-bold text-gray-900 tracking-tight">{t('common.dashboard')}</h1>
-          <p className="text-gray-500 mt-2">Welcome back, here's what's happening today.</p>
+          <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 tracking-tight">{t('common.dashboard')}</h1>
+          <p className="text-gray-500 mt-1 lg:mt-2">Welcome back, here's what's happening today.</p>
         </div>
-        <div className="flex gap-3">
-          <button className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors">
+        <div className="flex gap-2 lg:gap-3">
+          <button className="flex-1 sm:flex-none px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors">
             Export Report
           </button>
-          <button className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200">
+          <button className="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200">
             New Campaign
           </button>
         </div>

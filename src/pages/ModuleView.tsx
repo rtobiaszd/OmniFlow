@@ -76,6 +76,7 @@ export function ModuleView() {
       setEditingRecord(null);
       setFormData({});
     } catch (error) {
+      // Error is already handled in service, but we can log it here too if needed
       console.error('Error saving record:', error);
     } finally {
       setIsSubmitting(false);

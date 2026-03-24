@@ -41,7 +41,7 @@ export function Pipelines() {
   const [newPipelineName, setNewPipelineName] = useState('');
   const [newStageName, setNewStageName] = useState('');
   const [newFieldName, setNewFieldName] = useState('');
-  const [newFieldType, setNewFieldType] = useState<'text' | 'number' | 'date' | 'select'>('text');
+  const [newFieldType, setNewFieldType] = useState<CustomField['type']>('text');
   const [newFieldOptions, setNewFieldOptions] = useState('');
   const [newFieldRequired, setNewFieldRequired] = useState(false);
   
@@ -50,6 +50,9 @@ export function Pipelines() {
   const [newDealCompany, setNewDealCompany] = useState('');
   const [newDealCustomValues, setNewDealCustomValues] = useState<Record<string, any>>({});
   const [targetStageId, setTargetStageId] = useState<string | null>(null);
+
+  const [draggedDealId, setDraggedDealId] = useState<string | null>(null);
+  const [dropTargetStageId, setDropTargetStageId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!profile?.tenantId) return;
@@ -214,7 +217,7 @@ export function Pipelines() {
     setIsSubmitting(true);
     try {
       const newStage: Stage = {
-        id: `stage_${Date.now()}`,
+        id: `stage_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         name: newStageName,
         order: activePipeline.stages.length,
         color: 'bg-indigo-500'
@@ -236,8 +239,8 @@ export function Pipelines() {
     if (!newFieldName || !activePipeline) return;
     setIsSubmitting(true);
     try {
-      const newField: any = {
-        id: `field_${Date.now()}`,
+      const newField: CustomField = {
+        id: `field_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         name: newFieldName,
         type: newFieldType,
         required: newFieldRequired
@@ -262,6 +265,100 @@ export function Pipelines() {
     }
   };
 
+  const handleDragStart = (e: React.DragEvent, dealId: string) => {
+    setDraggedDealId(dealId);
+    e.dataTransfer.setData('dealId', dealId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, stageId: string) => {
+    e.preventDefault();
+    setDropTargetStageId(stageId);
+  };
+
+  const handleDragLeave = () => {
+    setDropTargetStageId(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, stageId: string) => {
+    e.preventDefault();
+    const dealId = e.dataTransfer.getData('dealId');
+    setDraggedDealId(null);
+    setDropTargetStageId(null);
+
+    const deal = deals.find(d => d.id === dealId);
+    if (deal && deal.stageId !== stageId) {
+      try {
+        await pipelineService.updateDeal({ ...deal, stageId });
+      } catch (error) {
+        console.error('Error moving deal:', error);
+      }
+    }
+  };
+
+  const renderCustomFieldInput = (field: CustomField, value: any, onChange: (val: any) => void) => {
+    const commonProps = {
+      className: "w-full px-4 py-2 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500",
+      required: field.required
+    };
+
+    if (field.type === 'boolean') {
+      return (
+        <div className="flex items-center gap-2">
+          <input 
+            type="checkbox" 
+            checked={!!value}
+            onChange={(e) => onChange(e.target.checked)}
+            className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+          />
+          <span className="text-sm text-gray-600">Yes / No</span>
+        </div>
+      );
+    }
+
+    if (field.type === 'textarea') {
+      return (
+        <textarea 
+          {...commonProps}
+          rows={3}
+          value={value || ''}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      );
+    }
+
+    if (field.type === 'select') {
+      return (
+        <select 
+          {...commonProps}
+          value={value || ''}
+          onChange={(e) => onChange(e.target.value)}
+        >
+          <option value="">Select...</option>
+          {field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+        </select>
+      );
+    }
+
+    const inputType = {
+      number: 'number',
+      date: 'date',
+      email: 'email',
+      url: 'url',
+      phone: 'tel',
+      text: 'text'
+    }[field.type] || 'text';
+
+    return (
+      <input 
+        type={inputType}
+        {...commonProps}
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    );
+  };
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -273,8 +370,8 @@ export function Pipelines() {
   return (
     <div className="h-[calc(100vh-64px)] flex flex-col bg-gray-50">
       {/* Header */}
-      <div className="p-8 pb-4 flex justify-between items-center bg-white border-b border-gray-100">
-        <div className="flex items-center gap-6">
+      <div className="p-4 lg:p-8 pb-4 flex flex-col lg:flex-row lg:justify-between lg:items-center bg-white border-b border-gray-100 gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 lg:gap-6">
           <div>
             <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
               <span>CRM</span> <ChevronRight size={14} /> <span className="font-semibold text-gray-900">Pipelines</span>
@@ -284,14 +381,14 @@ export function Pipelines() {
                 <select 
                   value={activePipelineId || ''} 
                   onChange={(e) => setActivePipelineId(e.target.value)}
-                  className="text-2xl font-bold text-gray-900 bg-transparent border-none focus:ring-0 p-0 cursor-pointer hover:text-indigo-600 transition-colors"
+                  className="text-xl lg:text-2xl font-bold text-gray-900 bg-transparent border-none focus:ring-0 p-0 cursor-pointer hover:text-indigo-600 transition-colors max-w-[200px] lg:max-w-none truncate"
                 >
                   {pipelines.map(p => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
               ) : (
-                <span className="text-2xl font-bold text-gray-400 italic">No Pipelines</span>
+                <span className="text-xl lg:text-2xl font-bold text-gray-400 italic">No Pipelines</span>
               )}
               <button 
                 onClick={() => setIsAddingPipeline(true)}
@@ -312,7 +409,7 @@ export function Pipelines() {
             </div>
           </div>
 
-          <div className="h-10 w-px bg-gray-200"></div>
+          <div className="hidden sm:block h-10 w-px bg-gray-200"></div>
 
           <div className="flex gap-2">
             <button 
@@ -325,10 +422,10 @@ export function Pipelines() {
           </div>
         </div>
 
-        <div className="flex gap-3">
-          <div className="relative">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1 sm:flex-none">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-            <input type="text" placeholder="Search deals..." className="pl-10 pr-4 py-2 bg-gray-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-indigo-500" />
+            <input type="text" placeholder="Search deals..." className="w-full pl-10 pr-4 py-2 bg-gray-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-indigo-500" />
           </div>
           <button 
             onClick={() => {
@@ -338,7 +435,7 @@ export function Pipelines() {
               }
             }}
             disabled={!activePipeline}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 flex items-center gap-2 shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 flex items-center justify-center gap-2 shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus size={16} /> New Deal
           </button>
@@ -346,9 +443,18 @@ export function Pipelines() {
       </div>
 
       {/* Board */}
-      <div className="flex-1 overflow-x-auto p-8 pt-6 flex gap-6 items-start">
+      <div className="flex-1 overflow-x-auto p-4 lg:p-8 pt-6 flex gap-4 lg:gap-6 items-start">
         {activePipeline?.stages?.sort((a, b) => a.order - b.order).map((stage) => (
-          <div key={stage.id} className="w-80 shrink-0 flex flex-col gap-4">
+          <div 
+            key={stage.id} 
+            className={cn(
+              "w-80 shrink-0 flex flex-col gap-4 p-2 rounded-3xl transition-colors",
+              dropTargetStageId === stage.id ? "bg-indigo-50/50 outline-2 outline-dashed outline-indigo-200" : "bg-transparent"
+            )}
+            onDragOver={(e) => handleDragOver(e, stage.id)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, stage.id)}
+          >
             <div className="flex items-center justify-between px-2">
               <div className="flex items-center gap-2">
                 <div className={cn("w-2 h-2 rounded-full", stage.color)}></div>
@@ -365,8 +471,13 @@ export function Pipelines() {
                 <motion.div 
                   key={deal.id}
                   layoutId={deal.id}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, deal.id)}
                   onClick={() => setEditingDeal(deal)}
-                  className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer group"
+                  className={cn(
+                    "bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer group",
+                    draggedDealId === deal.id && "opacity-50"
+                  )}
                 >
                     <div className="flex justify-between items-start mb-3">
                       <h4 className="font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">{deal.title}</h4>
@@ -467,24 +578,10 @@ export function Pipelines() {
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">
                       {field.name} {field.required && <span className="text-red-500">*</span>}
                     </label>
-                    {field.type === 'select' ? (
-                      <select 
-                        value={newDealCustomValues[field.id] || ''}
-                        onChange={(e) => setNewDealCustomValues({...newDealCustomValues, [field.id]: e.target.value})}
-                        className="w-full px-4 py-2 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500"
-                        required={field.required}
-                      >
-                        <option value="">Select...</option>
-                        {field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                      </select>
-                    ) : (
-                      <input 
-                        type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
-                        value={newDealCustomValues[field.id] || ''}
-                        onChange={(e) => setNewDealCustomValues({...newDealCustomValues, [field.id]: e.target.value})}
-                        className="w-full px-4 py-2 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500"
-                        required={field.required}
-                      />
+                    {renderCustomFieldInput(
+                      field, 
+                      newDealCustomValues[field.id], 
+                      (val) => setNewDealCustomValues({ ...newDealCustomValues, [field.id]: val })
                     )}
                   </div>
                 ))}
@@ -577,30 +674,13 @@ export function Pipelines() {
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">
                       {field.name} {field.required && <span className="text-red-500">*</span>}
                     </label>
-                    {field.type === 'select' ? (
-                      <select 
-                        value={editingDeal.customValues?.[field.id] || ''}
-                        onChange={(e) => setEditingDeal({
-                          ...editingDeal, 
-                          customValues: { ...editingDeal.customValues, [field.id]: e.target.value }
-                        })}
-                        className="w-full px-4 py-2 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500"
-                        required={field.required}
-                      >
-                        <option value="">Select...</option>
-                        {field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                      </select>
-                    ) : (
-                      <input 
-                        type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
-                        value={editingDeal.customValues?.[field.id] || ''}
-                        onChange={(e) => setEditingDeal({
-                          ...editingDeal, 
-                          customValues: { ...editingDeal.customValues, [field.id]: e.target.value }
-                        })}
-                        className="w-full px-4 py-2 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500"
-                        required={field.required}
-                      />
+                    {renderCustomFieldInput(
+                      field,
+                      editingDeal.customValues?.[field.id],
+                      (val) => setEditingDeal({
+                        ...editingDeal,
+                        customValues: { ...editingDeal.customValues, [field.id]: val }
+                      })
                     )}
                   </div>
                 ))}
@@ -702,8 +782,8 @@ export function Pipelines() {
               <div className="space-y-6">
                 <div className="space-y-3">
                   {activePipeline?.customFields?.map(f => (
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
-                  <div>
+                  <div key={f.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                    <div>
                     <div className="font-bold text-gray-900 text-sm">{f.name}</div>
                     <div className="text-[10px] text-gray-400 uppercase font-bold">{f.type}</div>
                   </div>
@@ -736,6 +816,11 @@ export function Pipelines() {
                       <option value="number">Number</option>
                       <option value="date">Date</option>
                       <option value="select">Select (Dropdown)</option>
+                      <option value="boolean">Checkbox</option>
+                      <option value="email">Email</option>
+                      <option value="url">URL</option>
+                      <option value="phone">Phone</option>
+                      <option value="textarea">Text Area</option>
                     </select>
                   </div>
                   {newFieldType === 'select' && (

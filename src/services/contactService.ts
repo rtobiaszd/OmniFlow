@@ -10,6 +10,7 @@ import {
   Timestamp 
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
 export interface Contact {
   id: string;
@@ -37,30 +38,44 @@ export const contactService = {
         ...doc.data()
       })) as Contact[];
       callback(contacts);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'contacts');
     });
   },
 
   createContact: async (tenantId: string, contactData: Omit<Contact, 'id' | 'tenantId' | 'createdAt' | 'updatedAt'>) => {
     if (!db) return;
-    return addDoc(collection(db, 'contacts'), {
-      ...contactData,
-      tenantId,
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now()
-    });
+    try {
+      return await addDoc(collection(db, 'contacts'), {
+        ...contactData,
+        tenantId,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'contacts');
+    }
   },
 
   updateContact: async (id: string, contactData: Partial<Contact>) => {
     if (!db) return;
-    const contactRef = doc(db, 'contacts', id);
-    return updateDoc(contactRef, {
-      ...contactData,
-      updatedAt: Timestamp.now()
-    });
+    try {
+      const contactRef = doc(db, 'contacts', id);
+      return await updateDoc(contactRef, {
+        ...contactData,
+        updatedAt: Timestamp.now()
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `contacts/${id}`);
+    }
   },
 
   deleteContact: async (id: string) => {
     if (!db) return;
-    return deleteDoc(doc(db, 'contacts', id));
+    try {
+      return await deleteDoc(doc(db, 'contacts', id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `contacts/${id}`);
+    }
   }
 };

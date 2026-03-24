@@ -45,7 +45,7 @@ export interface WorkflowNode {
 export interface CustomField {
   id: string;
   name: string;
-  type: 'text' | 'number' | 'date' | 'select';
+  type: 'text' | 'number' | 'date' | 'select' | 'boolean' | 'email' | 'url' | 'phone' | 'textarea';
   options?: string[]; // For select type
   required: boolean;
 }
@@ -130,5 +130,19 @@ export interface ModuleRecord {
   moduleId: string;
   tenantId: string;
   data: Record<string, any>;
+  createdAt: string;
+}
+
+export interface Appointment {
+  id: string;
+  tenantId: string;
+  title: string;
+  description?: string;
+  startTime: string; // ISO string
+  endTime: string; // ISO string
+  type: 'meeting' | 'call' | 'demo' | 'other';
+  contactId?: string;
+  location?: string;
+  status: 'scheduled' | 'cancelled' | 'completed';
   createdAt: string;
 }

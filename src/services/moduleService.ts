@@ -35,31 +35,43 @@ export const moduleService = {
 
   async createModuleDefinition(tenantId: string, definition: Omit<ModuleDefinition, 'id' | 'createdAt' | 'tenantId'>) {
     if (!db) return;
-    const id = `mod_${Date.now()}`;
-    const newDefinition: ModuleDefinition = {
-      ...definition,
-      id,
-      tenantId,
-      createdAt: new Date().toISOString()
-    };
-    await setDoc(doc(db, MODULE_DEFINITIONS_COLLECTION, id), newDefinition);
-    return newDefinition;
+    try {
+      const id = `mod_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const newDefinition: ModuleDefinition = {
+        ...definition,
+        id,
+        tenantId,
+        createdAt: new Date().toISOString()
+      };
+      await setDoc(doc(db, MODULE_DEFINITIONS_COLLECTION, id), newDefinition);
+      return newDefinition;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, MODULE_DEFINITIONS_COLLECTION);
+    }
   },
 
   async updateModuleDefinition(id: string, definition: Partial<ModuleDefinition>) {
     if (!db) return;
-    const docRef = doc(db, MODULE_DEFINITIONS_COLLECTION, id);
-    await updateDoc(docRef, { ...definition });
+    try {
+      const docRef = doc(db, MODULE_DEFINITIONS_COLLECTION, id);
+      await updateDoc(docRef, { ...definition });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `${MODULE_DEFINITIONS_COLLECTION}/${id}`);
+    }
   },
 
   async deleteModuleDefinition(id: string) {
     if (!db) return;
-    await deleteDoc(doc(db, MODULE_DEFINITIONS_COLLECTION, id));
-    // Also delete all records associated with this module
-    const q = query(collection(db, MODULE_RECORDS_COLLECTION), where('moduleId', '==', id));
-    const snapshot = await getDocs(q);
-    const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
-    await Promise.all(deletePromises);
+    try {
+      await deleteDoc(doc(db, MODULE_DEFINITIONS_COLLECTION, id));
+      // Also delete all records associated with this module
+      const q = query(collection(db, MODULE_RECORDS_COLLECTION), where('moduleId', '==', id));
+      const snapshot = await getDocs(q);
+      const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
+      await Promise.all(deletePromises);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `${MODULE_DEFINITIONS_COLLECTION}/${id}`);
+    }
   },
 
   // Module Records
@@ -80,26 +92,38 @@ export const moduleService = {
 
   async createModuleRecord(tenantId: string, moduleId: string, data: Record<string, any>) {
     if (!db) return;
-    const id = `rec_${Date.now()}`;
-    const newRecord: ModuleRecord = {
-      id,
-      moduleId,
-      tenantId,
-      data,
-      createdAt: new Date().toISOString()
-    };
-    await setDoc(doc(db, MODULE_RECORDS_COLLECTION, id), newRecord);
-    return newRecord;
+    try {
+      const id = `rec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const newRecord: ModuleRecord = {
+        id,
+        moduleId,
+        tenantId,
+        data,
+        createdAt: new Date().toISOString()
+      };
+      await setDoc(doc(db, MODULE_RECORDS_COLLECTION, id), newRecord);
+      return newRecord;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, MODULE_RECORDS_COLLECTION);
+    }
   },
 
   async updateModuleRecord(id: string, data: Record<string, any>) {
     if (!db) return;
-    const docRef = doc(db, MODULE_RECORDS_COLLECTION, id);
-    await updateDoc(docRef, { data });
+    try {
+      const docRef = doc(db, MODULE_RECORDS_COLLECTION, id);
+      await updateDoc(docRef, { data });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `${MODULE_RECORDS_COLLECTION}/${id}`);
+    }
   },
 
   async deleteModuleRecord(id: string) {
     if (!db) return;
-    await deleteDoc(doc(db, MODULE_RECORDS_COLLECTION, id));
+    try {
+      await deleteDoc(doc(db, MODULE_RECORDS_COLLECTION, id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `${MODULE_RECORDS_COLLECTION}/${id}`);
+    }
   }
 };
