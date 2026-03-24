@@ -43,10 +43,11 @@ export const messageService = {
     });
   },
 
-  subscribeToMessages(conversationId: string, callback: (messages: Message[]) => void) {
+  subscribeToMessages(tenantId: string, conversationId: string, callback: (messages: Message[]) => void) {
     if (!db) return () => {};
     const q = query(
       collection(db, MESSAGES_COLLECTION), 
+      where('tenantId', '==', tenantId),
       where('conversationId', '==', conversationId),
       orderBy('timestamp', 'asc')
     );
@@ -61,6 +62,7 @@ export const messageService = {
     
     const messageData: Omit<Message, 'id'> = {
       conversationId,
+      tenantId,
       content,
       channel: channel as any,
       timestamp: new Date().toISOString(),

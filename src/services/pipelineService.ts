@@ -11,6 +11,7 @@ import {
   onSnapshot
 } from 'firebase/firestore';
 import { Pipeline, Deal } from '../types';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
 const PIPELINES_COLLECTION = 'pipelines';
 const DEALS_COLLECTION = 'deals';
@@ -19,9 +20,14 @@ export const pipelineService = {
   // Pipeline operations
   async getPipelines(tenantId: string): Promise<Pipeline[]> {
     if (!db) return [];
-    const q = query(collection(db, PIPELINES_COLLECTION), where('tenantId', '==', tenantId));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ ...doc.data() } as Pipeline));
+    try {
+      const q = query(collection(db, PIPELINES_COLLECTION), where('tenantId', '==', tenantId));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ ...doc.data() } as Pipeline));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, PIPELINES_COLLECTION);
+      return [];
+    }
   },
 
   subscribeToPipelines(tenantId: string, callback: (pipelines: Pipeline[]) => void) {
@@ -30,6 +36,8 @@ export const pipelineService = {
     return onSnapshot(q, (snapshot) => {
       const pipelines = snapshot.docs.map(doc => ({ ...doc.data() } as Pipeline));
       callback(pipelines);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, PIPELINES_COLLECTION);
     });
   },
 
@@ -43,7 +51,6 @@ export const pipelineService = {
         { id: `stage_${Date.now()}`, name: 'New Stage', order: 0, color: 'bg-blue-500' }
       ],
       customFields: [],
-      // @ts-ignore
       tenantId
     };
     await setDoc(doc(db, PIPELINES_COLLECTION, id), pipeline);
@@ -72,17 +79,18 @@ export const pipelineService = {
     return onSnapshot(q, (snapshot) => {
       const deals = snapshot.docs.map(doc => ({ ...doc.data() } as Deal));
       callback(deals);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, DEALS_COLLECTION);
     });
   },
 
-  async createDeal(tenantId: string, deal: Omit<Deal, 'id' | 'createdAt'>) {
+  async createDeal(tenantId: string, deal: Omit<Deal, 'id' | 'createdAt' | 'tenantId'>) {
     if (!db) return;
     const id = `deal_${Date.now()}`;
     const newDeal: Deal = {
       ...deal,
       id,
       createdAt: new Date().toISOString(),
-      // @ts-ignore
       tenantId
     };
     await setDoc(doc(db, DEALS_COLLECTION, id), newDeal);

@@ -37,7 +37,8 @@ export class WorkflowService implements IWorkflowService {
       customValues: {},
       assignedTo: 'Workflow Engine',
       createdAt: new Date().toISOString(),
-      contactId: payload.contactId || 'c_auto'
+      contactId: payload.contactId || 'c_auto',
+      tenantId: payload.tenantId || 't_unknown'
     };
     await this.dealRepo.create(newDeal);
   }

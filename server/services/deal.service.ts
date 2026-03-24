@@ -22,8 +22,9 @@ export class DealService implements IDealService {
       customValues: dealData.customValues || {},
       assignedTo: dealData.assignedTo || 'Unassigned',
       createdAt: new Date().toISOString(),
-      contactId: dealData.contactId || 'c_unknown'
-    };
+      contactId: dealData.contactId || 'c_unknown',
+      tenantId: dealData.tenantId || 't_unknown'
+    } as Deal;
     return this.dealRepo.create(newDeal);
   }
 

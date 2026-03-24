@@ -13,13 +13,14 @@ export class PipelineService implements IPipelineService {
     return this.pipelineRepo.findById(id);
   }
 
-  async createPipeline(name: string): Promise<Pipeline> {
+  async createPipeline(name: string, tenantId: string = 't_unknown'): Promise<Pipeline> {
     return this.pipelineRepo.create({
       id: `p${Date.now()}`,
       name,
       stages: [],
-      customFields: []
-    });
+      customFields: [],
+      tenantId
+    } as Pipeline);
   }
 
   async updatePipeline(id: string, data: Partial<Pipeline>): Promise<Pipeline | undefined> {

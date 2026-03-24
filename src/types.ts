@@ -55,6 +55,7 @@ export interface Pipeline {
   name: string;
   stages: Stage[];
   customFields: CustomField[];
+  tenantId: string;
 }
 
 export interface Stage {
@@ -81,11 +82,13 @@ export interface Deal {
   customValues: Record<string, any>;
   assignedTo: string;
   createdAt: string;
+  tenantId: string;
 }
 
 export interface Message {
   id: string;
   conversationId: string;
+  tenantId: string;
   senderId?: string;
   contactId?: string;
   content: string;

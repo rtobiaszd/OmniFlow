@@ -5,6 +5,7 @@ export const db = {
     {
       id: 'p1',
       name: 'Main Sales Pipeline',
+      tenantId: 't1',
       stages: [
         { id: 's1', name: 'New Leads', order: 0, color: 'bg-blue-500' },
         { id: 's2', name: 'Contacted', order: 1, color: 'bg-indigo-500' },
@@ -21,6 +22,7 @@ export const db = {
     {
       id: 'p2',
       name: 'Support Tickets',
+      tenantId: 't1',
       stages: [
         { id: 's7', name: 'Open', order: 0, color: 'bg-red-500' },
         { id: 's8', name: 'In Progress', order: 1, color: 'bg-blue-500' },
@@ -32,9 +34,9 @@ export const db = {
     }
   ] as Pipeline[],
   deals: [
-    { id: '1', title: 'Enterprise License', company: 'TechCorp', value: 12000, stageId: 's1', pipelineId: 'p1', priority: 'high', status: 'open', customValues: {}, assignedTo: 'JD', createdAt: '2026-03-20', contactId: 'c1' },
-    { id: '2', title: 'API Integration', company: 'GlobalSoft', value: 5500, stageId: 's1', pipelineId: 'p1', priority: 'medium', status: 'open', customValues: {}, assignedTo: 'AS', createdAt: '2026-03-21', contactId: 'c2' },
-    { id: '3', title: 'Support Issue #1', company: 'StartupInc', value: 0, stageId: 's7', pipelineId: 'p2', priority: 'high', status: 'open', customValues: { cf3: 'P0' }, assignedTo: 'JD', createdAt: '2026-03-22', contactId: 'c3' },
+    { id: '1', title: 'Enterprise License', company: 'TechCorp', value: 12000, stageId: 's1', pipelineId: 'p1', priority: 'high', status: 'open', customValues: {}, assignedTo: 'JD', createdAt: '2026-03-20', contactId: 'c1', tenantId: 't1' },
+    { id: '2', title: 'API Integration', company: 'GlobalSoft', value: 5500, stageId: 's1', pipelineId: 'p1', priority: 'medium', status: 'open', customValues: {}, assignedTo: 'AS', createdAt: '2026-03-21', contactId: 'c2', tenantId: 't1' },
+    { id: '3', title: 'Support Issue #1', company: 'StartupInc', value: 0, stageId: 's7', pipelineId: 'p2', priority: 'high', status: 'open', customValues: { cf3: 'P0' }, assignedTo: 'JD', createdAt: '2026-03-22', contactId: 'c3', tenantId: 't1' },
   ] as Deal[],
   workflows: [
     { 

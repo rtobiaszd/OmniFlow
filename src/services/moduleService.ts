@@ -12,6 +12,7 @@ import {
   orderBy
 } from 'firebase/firestore';
 import { ModuleDefinition, ModuleRecord } from '../types';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
 const MODULE_DEFINITIONS_COLLECTION = 'module_definitions';
 const MODULE_RECORDS_COLLECTION = 'module_records';
@@ -27,6 +28,8 @@ export const moduleService = {
     return onSnapshot(q, (snapshot) => {
       const modules = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ModuleDefinition));
       callback(modules);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, MODULE_DEFINITIONS_COLLECTION);
     });
   },
 
@@ -70,6 +73,8 @@ export const moduleService = {
     return onSnapshot(q, (snapshot) => {
       const records = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ModuleRecord));
       callback(records);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, MODULE_RECORDS_COLLECTION);
     });
   },
 

@@ -44,14 +44,14 @@ export function Inbox() {
   }, [profile?.tenantId]);
 
   useEffect(() => {
-    if (!activeConversation?.id) return;
+    if (!activeConversation?.id || !profile?.tenantId) return;
 
-    const unsub = messageService.subscribeToMessages(activeConversation.id, (data) => {
+    const unsub = messageService.subscribeToMessages(profile.tenantId, activeConversation.id, (data) => {
       setMessages(data);
     });
 
     return () => unsub();
-  }, [activeConversation?.id]);
+  }, [activeConversation?.id, profile?.tenantId]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -12,15 +12,21 @@ import {
   onSnapshot
 } from 'firebase/firestore';
 import { Integration } from '../types';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
 const COLLECTION = 'integrations';
 
 export const integrationService = {
   async getIntegrations(tenantId: string): Promise<Integration[]> {
     if (!db) return [];
-    const q = query(collection(db, COLLECTION), where('tenantId', '==', tenantId));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ ...doc.data() } as Integration));
+    try {
+      const q = query(collection(db, COLLECTION), where('tenantId', '==', tenantId));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ ...doc.data() } as Integration));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, COLLECTION);
+      return [];
+    }
   },
 
   subscribeToIntegrations(tenantId: string, callback: (integrations: Integration[]) => void) {
@@ -29,6 +35,8 @@ export const integrationService = {
     return onSnapshot(q, (snapshot) => {
       const integrations = snapshot.docs.map(doc => ({ ...doc.data() } as Integration));
       callback(integrations);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, COLLECTION);
     });
   },
 
