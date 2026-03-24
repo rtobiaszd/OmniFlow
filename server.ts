@@ -5,12 +5,19 @@ import { fileURLToPath } from "url";
 import apiRoutes from "./server/routes/api";
 import { errorHandler } from "./server/middleware/error.middleware";
 
+import { MailService } from "./server/services/mail.service";
+
+const mailService = new MailService();
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
+
+  // Start mail service
+  mailService.startPolling();
 
   app.use(express.json());
 

@@ -26,7 +26,10 @@ import {
   Loader2,
   Plug,
   Database,
-  Trash2
+  Trash2,
+  Mail,
+  Send,
+  MailOpen
 } from 'lucide-react';
 import { Workflow, WorkflowNode } from '../types';
 import { workflowService } from '../services/workflowService';
@@ -40,6 +43,9 @@ const NODE_TYPES = {
   condition: { icon: GitMerge, color: 'bg-indigo-500', label: 'Condition' },
   webhook: { icon: Plug, color: 'bg-green-500', label: 'Webhook' },
   api: { icon: Database, color: 'bg-gray-700', label: 'Generic API' },
+  email_trigger: { icon: Mail, color: 'bg-sky-500', label: 'Email Trigger' },
+  email_action: { icon: Send, color: 'bg-emerald-500', label: 'Send Email' },
+  email_read: { icon: MailOpen, color: 'bg-teal-500', label: 'Read Email' },
 };
 
 interface WorkflowEditorProps {
@@ -53,19 +59,22 @@ export function WorkflowEditor({ workflow, onClose }: WorkflowEditorProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 
-  const renderNodeLabel = (type: string, data: any) => (
-    <div className="flex items-center gap-2 p-2">
-      <div className={`p-1.5 rounded-lg ${NODE_TYPES[type as keyof typeof NODE_TYPES]?.color || 'bg-gray-500'} text-white`}>
-        {React.createElement(NODE_TYPES[type as keyof typeof NODE_TYPES]?.icon || Zap, { size: 14 })}
-      </div>
-      <div className="text-left">
-        <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">
-          {NODE_TYPES[type as keyof typeof NODE_TYPES]?.label || 'Node'}
+  const renderNodeLabel = (type: string, data: any) => {
+    const label = (typeof data?.label === 'string') ? data.label : 'New Node';
+    return (
+      <div className="flex items-center gap-2 p-2">
+        <div className={`p-1.5 rounded-lg ${NODE_TYPES[type as keyof typeof NODE_TYPES]?.color || 'bg-gray-500'} text-white`}>
+          {React.createElement(NODE_TYPES[type as keyof typeof NODE_TYPES]?.icon || Zap, { size: 14 })}
         </div>
-        <div className="text-xs font-bold text-gray-900 truncate max-w-[120px]">{data.label || 'New Node'}</div>
+        <div className="text-left">
+          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">
+            {NODE_TYPES[type as keyof typeof NODE_TYPES]?.label || 'Node'}
+          </div>
+          <div className="text-xs font-bold text-gray-900 truncate max-w-[120px]">{label}</div>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   useEffect(() => {
     // Map our workflow nodes to ReactFlow nodes
@@ -353,6 +362,102 @@ export function WorkflowEditor({ workflow, onClose }: WorkflowEditorProps) {
                       className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
                     />
                     <p className="text-[10px] text-gray-400 mt-2">Use JavaScript expressions to evaluate the condition.</p>
+                  </div>
+                )}
+                
+                {/* Email Trigger Configuration */}
+                {(selectedNode.data.originalNode as WorkflowNode).type === 'email_trigger' && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Filter by Sender</label>
+                      <input 
+                        type="text"
+                        value={(selectedNode.data.originalNode as WorkflowNode).data.sender || ''}
+                        onChange={(e) => updateNodeData(selectedNode.id, { sender: e.target.value })}
+                        placeholder="e.g. support@company.com"
+                        className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Subject Keyword</label>
+                      <input 
+                        type="text"
+                        value={(selectedNode.data.originalNode as WorkflowNode).data.subject || ''}
+                        onChange={(e) => updateNodeData(selectedNode.id, { subject: e.target.value })}
+                        placeholder="e.g. [URGENT]"
+                        className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                      />
+                    </div>
+                    <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl">
+                      <p className="text-[10px] text-blue-600 font-medium">This node will trigger the workflow whenever a matching email is received.</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Email Action Configuration */}
+                {(selectedNode.data.originalNode as WorkflowNode).type === 'email_action' && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">To (Recipient)</label>
+                      <input 
+                        type="text"
+                        value={(selectedNode.data.originalNode as WorkflowNode).data.to || ''}
+                        onChange={(e) => updateNodeData(selectedNode.id, { to: e.target.value })}
+                        placeholder="e.g. {{sender_email}} or client@mail.com"
+                        className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Subject</label>
+                      <input 
+                        type="text"
+                        value={(selectedNode.data.originalNode as WorkflowNode).data.subject || ''}
+                        onChange={(e) => updateNodeData(selectedNode.id, { subject: e.target.value })}
+                        placeholder="e.g. Re: {{original_subject}}"
+                        className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Body / Content</label>
+                      <textarea 
+                        value={(selectedNode.data.originalNode as WorkflowNode).data.body || ''}
+                        onChange={(e) => updateNodeData(selectedNode.id, { body: e.target.value })}
+                        placeholder="Write your email content here..."
+                        className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all h-32 resize-none"
+                      />
+                    </div>
+                    <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
+                      <p className="text-[10px] text-emerald-600 font-medium">Use tags like [sender_email] to inject variables into your message.</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Email Read Configuration */}
+                {(selectedNode.data.originalNode as WorkflowNode).type === 'email_read' && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Email ID / Reference</label>
+                      <input 
+                        type="text"
+                        value={(selectedNode.data.originalNode as WorkflowNode).data.ref || ''}
+                        onChange={(e) => updateNodeData(selectedNode.id, { ref: e.target.value })}
+                        placeholder="e.g. {{last_email_id}}"
+                        className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Properties to Extract</label>
+                      <input 
+                        type="text"
+                        value={(selectedNode.data.originalNode as WorkflowNode).data.extract || ''}
+                        onChange={(e) => updateNodeData(selectedNode.id, { extract: e.target.value })}
+                        placeholder="e.g. body, attachment_name"
+                        className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                      />
+                    </div>
+                    <div className="p-3 bg-teal-50 border border-teal-100 rounded-xl">
+                      <p className="text-[10px] text-teal-600 font-medium">Fetches detailed content from an email to be used in following steps.</p>
+                    </div>
                   </div>
                 )}
 

@@ -36,7 +36,7 @@ export interface Workflow {
 
 export interface WorkflowNode {
   id: string;
-  type: 'trigger' | 'condition' | 'action' | 'ai' | 'delay' | 'webhook' | 'api';
+  type: 'trigger' | 'condition' | 'action' | 'ai' | 'delay' | 'webhook' | 'api' | 'email_trigger' | 'email_action' | 'email_read';
   data: Record<string, any>;
   position: { x: number; y: number };
 }

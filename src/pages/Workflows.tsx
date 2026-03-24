@@ -89,6 +89,38 @@ const WORKFLOW_TEMPLATES = [
       { id: '4', type: 'action' as const, data: { label: 'Enviar WhatsApp Recuperação' }, position: { x: 250, y: 300 } }
     ],
     edges: [{ id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3' }, { id: 'e3-4', source: '3', target: '4' }]
+  },
+  {
+    id: 'template-email-auto',
+    name: 'Auto-Resposta de Email',
+    description: 'Responde automaticamente a emails com palavras-chave específicas.',
+    niche: 'Atendimento',
+    nodes: [
+      { id: '1', type: 'email_trigger' as const, data: { label: 'Email Recebido', subject: 'Suporte' }, position: { x: 250, y: 0 } },
+      { id: '2', type: 'ai' as const, data: { label: 'Gerar Resposta', prompt: 'Gere uma resposta educada confirmando o recebimento do ticket.' }, position: { x: 250, y: 100 } },
+      { id: '3', type: 'email_action' as const, data: { label: 'Enviar Resposta', to: '{{sender}}', subject: 'Re: {{subject}}' }, position: { x: 250, y: 200 } }
+    ],
+    edges: [{ id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3' }]
+  },
+  {
+    id: 'template-omni-lead',
+    name: 'OmniFlow: Automação de Leads 360°',
+    description: 'Captura e-mails, processa com IA, envia resposta por e-mail e alerta via WhatsApp.',
+    niche: 'Vendas',
+    nodes: [
+      { id: '1', type: 'email_trigger' as const, data: { label: 'Novo Lead (Email)', subject: 'Orçamento' }, position: { x: 250, y: 0 } },
+      { id: '2', type: 'ai' as const, data: { label: 'Qualificar e Responder', prompt: 'Analise o interesse do lead e gere um texto de boas-vindas.' }, position: { x: 250, y: 100 } },
+      { id: '3', type: 'email_action' as const, data: { label: 'Responder E-mail', to: '{{sender}}', subject: 'Re: {{subject}}' }, position: { x: 100, y: 200 } },
+      { id: '4', type: 'action' as const, data: { label: 'Alerta WhatsApp', action: 'send_whatsapp' }, position: { x: 400, y: 200 } },
+      { id: '5', type: 'action' as const, data: { label: 'Criar Negócio no CRM', action: 'create_deal', pipelineId: 'p1', stageId: 's1' }, position: { x: 250, y: 300 } }
+    ],
+    edges: [
+      { id: 'e1-2', source: '1', target: '2' },
+      { id: 'e2-3', source: '2', target: '3' },
+      { id: 'e2-4', source: '2', target: '4' },
+      { id: 'e3-5', source: '3', target: '5' },
+      { id: 'e4-5', source: '4', target: '5' }
+    ]
   }
 ];
 
