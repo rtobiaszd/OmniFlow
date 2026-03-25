@@ -17,6 +17,7 @@ export interface Integration {
   provider: 'whatsapp' | 'email' | 'telegram' | 'jira' | 'github' | 'slack' | 'facebook' | 'instagram' | 'webhook' | 'api' | 'google_sheets' | 'gmail' | 'google_drive' | 'google_calendar' | 'outlook_calendar' | 'google_cloud';
   name: string;
   status: 'connected' | 'disconnected' | 'error';
+  active?: boolean;
   config: Record<string, any>;
   tenantId: string;
   authUrl?: string;

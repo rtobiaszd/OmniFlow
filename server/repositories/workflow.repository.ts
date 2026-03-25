@@ -1,25 +1,22 @@
-import { adminDb } from "../lib/firebase-admin";
+import prisma from "../lib/prisma";
 import { Workflow } from "../../src/types";
 
 export class WorkflowRepository {
-  private collection = adminDb.collection("workflows");
-
   async findAll(): Promise<Workflow[]> {
-    const snapshot = await this.collection.get();
-    return snapshot.docs.map(doc => ({ ...doc.data() } as Workflow));
+    return (await prisma.workflow.findMany()) as any;
   }
 
   async findById(id: string): Promise<Workflow | undefined> {
-    const doc = await this.collection.doc(id).get();
-    return doc.exists ? (doc.data() as Workflow) : undefined;
+    return (await prisma.workflow.findUnique({ where: { id } })) as any;
   }
 
   async findActiveByTrigger(event: string): Promise<Workflow[]> {
-    const snapshot = await this.collection.where("active", "==", true).get();
-    const workflows = snapshot.docs.map(doc => ({ ...doc.data() } as Workflow));
+    const workflows = await prisma.workflow.findMany({
+      where: { active: true }
+    });
     
-    return workflows.filter(w => 
-      w.nodes.some(n => 
+    return (workflows as any).filter((w: any) => 
+      w.nodes.some((n: any) => 
         (n.type === 'trigger' && n.data.event === event) ||
         (n.type === 'email_trigger' && event === 'email_received')
       )
@@ -27,17 +24,18 @@ export class WorkflowRepository {
   }
 
   async create(workflow: Workflow): Promise<Workflow> {
-    await this.collection.doc(workflow.id).set(workflow);
-    return workflow;
+    return (await prisma.workflow.create({ data: workflow as any })) as any;
   }
 
   async update(id: string, data: Partial<Workflow>): Promise<Workflow | undefined> {
-    await this.collection.doc(id).update(data);
-    return this.findById(id);
+    return (await prisma.workflow.update({ 
+      where: { id },
+      data: data as any
+    })) as any;
   }
 
   async delete(id: string): Promise<boolean> {
-    await this.collection.doc(id).delete();
+    await prisma.workflow.delete({ where: { id } });
     return true;
   }
 }

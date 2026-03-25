@@ -72,10 +72,14 @@ export function WorkflowEditor({ workflow, onClose }: WorkflowEditorProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [customModules, setCustomModules] = useState<ModuleDefinition[]>([]);
+  const [integrations, setIntegrations] = useState<any[]>([]);
 
   useEffect(() => {
     if (profile?.tenantId) {
       moduleService.subscribeToModuleDefinitions(profile.tenantId, setCustomModules);
+      import('../services/integrationService').then(({ integrationService }) => {
+        integrationService.getIntegrations(profile.tenantId!).then(setIntegrations);
+      });
     }
   }, [profile?.tenantId]);
 
@@ -190,16 +194,33 @@ export function WorkflowEditor({ workflow, onClose }: WorkflowEditorProps) {
 
   const addNode = (type: keyof typeof NODE_TYPES) => {
     const id = `node_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const defaultData: Record<string, any> = { label: `New ${NODE_TYPES[type].label}` };
+    
+    // Pre-configure specific types
+    if (type === 'gmail') {
+      defaultData.to = '{{contact_email}}';
+      defaultData.subject = 'Hello from OmniFlow';
+      defaultData.body = 'Hi, how can we help?';
+    } else if (type === 'slack_msg') {
+      defaultData.channelId = '#general';
+      defaultData.message = 'Workflow triggered!';
+    } else if (type === 'google_sheets') {
+      defaultData.action = 'APPEND';
+      defaultData.sheetName = 'Sheet1';
+    } else if (type === 'google_drive') {
+      defaultData.action = 'UPLOAD';
+    }
+
     const newNode: Node = {
       id,
       type: 'default',
       position: { x: Math.random() * 400, y: Math.random() * 400 },
       data: { 
-        label: renderNodeLabel(type, { label: `New ${NODE_TYPES[type].label}` }),
+        label: renderNodeLabel(type, defaultData),
         originalNode: {
           id,
           type,
-          data: { label: `New ${NODE_TYPES[type].label}` },
+          data: defaultData,
           position: { x: 0, y: 0 }
         }
       },
@@ -301,6 +322,23 @@ export function WorkflowEditor({ workflow, onClose }: WorkflowEditorProps) {
                     className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
                   />
                 </div>
+
+                {/* Integration Selector (common for many node types) */}
+                {['gmail', 'slack_msg', 'google_sheets', 'google_drive', 'email_trigger', 'email_action', 'email_read'].includes((selectedNode.data.originalNode as WorkflowNode).type) && (
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Integração</label>
+                    <select 
+                      value={(selectedNode.data.originalNode as WorkflowNode).data.integrationId || ''}
+                      onChange={(e) => updateNodeData(selectedNode.id, { integrationId: e.target.value })}
+                      className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                    >
+                      <option value="">Selecione a Integração...</option>
+                      {integrations.map(int => (
+                        <option key={int.id} value={int.id}>{int.name} ({int.provider})</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 {/* AI Logic Configuration */}
                 {(selectedNode.data.originalNode as WorkflowNode).type === 'ai' && (

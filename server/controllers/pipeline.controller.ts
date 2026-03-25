@@ -16,12 +16,28 @@ export class PipelineController {
 
   async create(req: Request, res: Response) {
     try {
-      const { name } = req.body;
-      if (!name) return sendError(res, "Pipeline name is required", 400);
-      const data = await this.pipelineService.createPipeline(name);
-      sendSuccess(res, data, 201);
+      const result = await this.pipelineService.createPipeline(req.body);
+      sendSuccess(res, result);
     } catch (error) {
       sendError(res, "Failed to create pipeline");
+    }
+  }
+
+  async update(req: Request, res: Response) {
+    try {
+      const result = await this.pipelineService.updatePipeline(req.params.id, req.body);
+      sendSuccess(res, result);
+    } catch (error) {
+      sendError(res, "Failed to update pipeline");
+    }
+  }
+
+  async delete(req: Request, res: Response) {
+    try {
+      await this.pipelineService.deletePipeline(req.params.id);
+      sendSuccess(res, true);
+    } catch (error) {
+      sendError(res, "Failed to delete pipeline");
     }
   }
 }

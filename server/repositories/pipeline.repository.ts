@@ -1,36 +1,29 @@
-import { db } from "../db";
+import prisma from "../lib/prisma";
 import { Pipeline } from "../../src/types";
 import { IPipelineRepository } from "../interfaces/repository.interface";
 
 export class PipelineRepository implements IPipelineRepository {
   async findAll(): Promise<Pipeline[]> {
-    return db.pipelines;
+    return (await prisma.pipeline.findMany()) as any;
   }
 
   async findById(id: string): Promise<Pipeline | undefined> {
-    return db.pipelines.find(p => p.id === id);
+    return (await prisma.pipeline.findUnique({ where: { id } })) as any;
   }
 
   async create(pipeline: Pipeline): Promise<Pipeline> {
-    db.pipelines.push(pipeline);
-    return pipeline;
+    return (await prisma.pipeline.create({ data: pipeline as any })) as any;
   }
 
   async update(id: string, data: Partial<Pipeline>): Promise<Pipeline | undefined> {
-    const index = db.pipelines.findIndex(p => p.id === id);
-    if (index !== -1) {
-      db.pipelines[index] = { ...db.pipelines[index], ...data };
-      return db.pipelines[index];
-    }
-    return undefined;
+    return (await prisma.pipeline.update({
+      where: { id },
+      data: data as any
+    })) as any;
   }
 
   async delete(id: string): Promise<boolean> {
-    const index = db.pipelines.findIndex(p => p.id === id);
-    if (index !== -1) {
-      db.pipelines.splice(index, 1);
-      return true;
-    }
-    return false;
+    await prisma.pipeline.delete({ where: { id } });
+    return true;
   }
 }

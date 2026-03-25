@@ -1,3 +1,6 @@
+import "dotenv/config";
+if (!process.env.NODE_ENV) process.env.NODE_ENV = 'development';
+
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
@@ -6,7 +9,9 @@ import apiRoutes from "./server/routes/api";
 import { errorHandler } from "./server/middleware/error.middleware";
 
 import { MailService } from "./server/services/mail.service";
+import { WorkflowService } from "./server/services/workflow.service";
 
+// Correct dependency injection
 const mailService = new MailService();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -16,10 +21,11 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // Start mail service
-  mailService.startPolling();
-
   app.use(express.json());
+  app.use((req, res, next) => {
+    console.log(`Server: ${req.method} ${req.url}`);
+    next();
+  });
 
   // --- API ROUTES ---
   app.use("/api", apiRoutes);
@@ -49,6 +55,7 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
+    mailService.startPolling();
   });
 }
 

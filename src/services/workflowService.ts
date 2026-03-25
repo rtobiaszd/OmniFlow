@@ -1,98 +1,62 @@
-import { db } from '../lib/firebase';
-import { 
-  collection, 
-  doc, 
-  setDoc, 
-  getDocs, 
-  query, 
-  where, 
-  updateDoc, 
-  deleteDoc,
-  onSnapshot
-} from 'firebase/firestore';
 import { Workflow } from '../types';
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
-const COLLECTION = 'workflows';
+const API_BASE = '/api/workflows';
 
 export const workflowService = {
   async getWorkflows(tenantId: string): Promise<Workflow[]> {
-    if (!db) return [];
     try {
-      const q = query(collection(db, COLLECTION), where('tenantId', '==', tenantId));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Workflow));
+      const resp = await fetch(`${API_BASE}?tenantId=${tenantId}`);
+      if (!resp.ok) throw new Error('Failed to fetch');
+      const data = await resp.json();
+      const workflows = data.data || [];
+      return workflows.filter((w: Workflow) => w.tenantId === tenantId);
     } catch (error) {
-      handleFirestoreError(error, OperationType.LIST, COLLECTION);
+      console.error('API Error:', error);
       return [];
     }
   },
 
   subscribeToWorkflows(tenantId: string, callback: (workflows: Workflow[]) => void) {
-    if (!db) return () => {};
-    const q = query(collection(db, COLLECTION), where('tenantId', '==', tenantId));
-    return onSnapshot(q, (snapshot) => {
-      const workflows = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Workflow));
-      callback(workflows);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, COLLECTION);
+    this.getWorkflows(tenantId).then(callback);
+    const interval = setInterval(() => {
+      this.getWorkflows(tenantId).then(callback);
+    }, 15000);
+    return () => clearInterval(interval);
+  },
+
+  async createWorkflow(tenantId: string, name: string, description: string = '') {
+    const resp = await fetch(API_BASE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tenantId, name, description })
     });
+    const data = await resp.json();
+    return data.data;
   },
 
-  async createWorkflow(tenantId: string, name: string, description: string) {
-    if (!db) return;
-    try {
-      const id = `wf_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const workflow: Workflow = {
-        id,
-        name,
-        description,
-        active: false,
-        nodes: [],
-        tenantId
-      };
-      await setDoc(doc(db, COLLECTION, id), workflow);
-      return workflow;
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, COLLECTION);
-    }
-  },
-
-  async updateWorkflow(workflow: Partial<Workflow> & { id: string }) {
-    if (!db) return;
-    try {
-      const docRef = doc(db, COLLECTION, workflow.id);
-      const { id, ...data } = workflow;
-      // Remove undefined values to prevent Firestore errors
-      const cleanData = Object.fromEntries(
-        Object.entries(data).filter(([_, v]) => v !== undefined)
-      );
-      await updateDoc(docRef, cleanData);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `${COLLECTION}/${workflow.id}`);
-    }
+  async updateWorkflow(workflow: Workflow) {
+    const resp = await fetch(`${API_BASE}/${workflow.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(workflow)
+    });
+    const data = await resp.json();
+    return data.data;
   },
 
   async deleteWorkflow(id: string) {
-    if (!db) {
-      console.error('Firestore database not initialized');
-      return;
-    }
-    try {
-      console.log(`Deleting document ${id} from collection ${COLLECTION}`);
-      await deleteDoc(doc(db, COLLECTION, id));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `${COLLECTION}/${id}`);
-    }
+    const resp = await fetch(`${API_BASE}/${id}`, {
+      method: 'DELETE'
+    });
+    return resp.ok;
   },
 
   async toggleActive(id: string, active: boolean) {
-    if (!db) return;
-    try {
-      const docRef = doc(db, COLLECTION, id);
-      await updateDoc(docRef, { active });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `${COLLECTION}/${id}`);
-    }
+    const resp = await fetch(`${API_BASE}/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ active })
+    });
+    return resp.ok;
   }
 };

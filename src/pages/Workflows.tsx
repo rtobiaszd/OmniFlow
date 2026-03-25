@@ -158,6 +158,42 @@ const WORKFLOW_TEMPLATES = [
       { id: 'e3-5', source: '3', target: '5' },
       { id: 'e4-5', source: '4', target: '5' }
     ]
+  },
+  {
+    id: 'template-chatbot-wa',
+    name: 'Chatbot WhatsApp Inteligente',
+    description: 'Respostas inteligentes 24h/dia com IA Gemini.',
+    niche: 'Chatbot',
+    nodes: [
+      { id: '1', type: 'trigger' as const, data: { label: 'Mensagem Recebida', event: 'message_received', channel: 'whatsapp' }, position: { x: 250, y: 0 } },
+      { id: '2', type: 'ai' as const, data: { label: 'IA Responder', prompt: 'Você é um assistente virtual...' }, position: { x: 250, y: 100 } },
+      { id: '3', type: 'action' as const, data: { label: 'Enviar Resposta', action: 'send_whatsapp' }, position: { x: 250, y: 200 } }
+    ],
+    edges: [{ id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3' }]
+  },
+  {
+    id: 'template-support',
+    name: 'Suporte por Email Automático',
+    description: 'Lê emails recebidos, usa IA para analisar e responde automaticamente.',
+    niche: 'Email',
+    nodes: [
+      { id: '1', type: 'email_trigger' as const, data: { label: 'Novo Email' }, position: { x: 250, y: 0 } },
+      { id: '2', type: 'ai' as const, data: { label: 'IA Responder', prompt: 'Responda cordialmente ao cliente...' }, position: { x: 250, y: 100 } },
+      { id: '3', type: 'email_action' as const, data: { label: 'Enviar Resposta', to: '{{sender_email}}', subject: 'Re: {{subject}}' }, position: { x: 250, y: 200 } }
+    ],
+    edges: [{ id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3' }]
+  },
+  {
+    id: 'template-leads',
+    name: 'Captura de Leads Automática',
+    description: 'Monitora emails de formulários e cria negócios no CRM.',
+    niche: 'Vendas',
+    nodes: [
+      { id: '1', type: 'email_trigger' as const, data: { label: 'Lead do Site', subject: 'Novo Lead' }, position: { x: 250, y: 0 } },
+      { id: '2', type: 'action' as const, data: { label: 'Criar Negócio', action: 'create_deal' }, position: { x: 250, y: 100 } },
+      { id: '3', type: 'slack_msg' as const, data: { label: 'Avisar no Slack', channelId: '#leads', message: 'Novo lead capturado: {{sender}}' }, position: { x: 250, y: 200 } }
+    ],
+    edges: [{ id: 'e1-2', source: '1', target: '2' }, { id: 'e2-3', source: '2', target: '3' }]
   }
 ];
 

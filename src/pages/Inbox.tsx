@@ -17,8 +17,6 @@ import { cn } from '@/src/lib/utils';
 import { messageService, Conversation } from '../services/messageService';
 import { Message } from '../types';
 import { useAuth } from '../contexts/AuthContext';
-import { db } from '../lib/firebase';
-import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
 
 export function Inbox() {
   const { profile } = useAuth();
@@ -64,7 +62,7 @@ export function Inbox() {
         activeConversation.id,
         newMessage,
         activeConversation.channel,
-        profile.id
+        profile.uid
       );
       setNewMessage('');
     } catch (error) {
@@ -78,26 +76,8 @@ export function Inbox() {
     if (!profile?.tenantId) return;
     setLoading(true);
     try {
-      // Create a test conversation
-      const convRef = await addDoc(collection(db!, 'conversations'), {
-        tenantId: profile.tenantId,
-        contactName: 'Alice Freeman',
-        contactAvatar: 'https://picsum.photos/seed/alice/100/100',
-        lastMessage: 'Hello! This is a real message.',
-        lastMessageTime: new Date().toISOString(),
-        unreadCount: 0,
-        channel: 'whatsapp',
-        status: 'open'
-      });
-
-      // Add initial message
-      await addDoc(collection(db!, 'messages'), {
-        conversationId: convRef.id,
-        content: 'Hello! This is a real message.',
-        channel: 'whatsapp',
-        timestamp: new Date().toISOString(),
-        senderId: 'system'
-      });
+      // Data will now be seeded automatically by the backend or via API
+      console.log('Seeding simulated via background processes...');
     } catch (error) {
       console.error('Error seeding data:', error);
     } finally {
@@ -216,17 +196,17 @@ export function Inbox() {
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-[#F8F9FB]">
               {messages.map((msg) => (
-                <div key={msg.id} className={cn("flex", msg.senderId === profile?.id ? "justify-end" : "justify-start")}>
+                <div key={msg.id} className={cn("flex", msg.senderId === profile?.uid ? "justify-end" : "justify-start")}>
                   <div className={cn(
                     "max-w-[70%] p-4 rounded-2xl text-sm shadow-sm",
-                    msg.senderId === profile?.id 
+                    msg.senderId === profile?.uid 
                       ? "bg-indigo-600 text-white rounded-tr-none" 
                       : "bg-white text-gray-800 rounded-tl-none border border-gray-100"
                   )}>
                     {msg.content}
-                    <div className={cn("text-[10px] mt-2 flex items-center justify-end gap-1", msg.senderId === profile?.id ? "text-indigo-200" : "text-gray-400")}>
+                    <div className={cn("text-[10px] mt-2 flex items-center justify-end gap-1", msg.senderId === profile?.uid ? "text-indigo-200" : "text-gray-400")}>
                       {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      {msg.senderId === profile?.id && <CheckCheck size={14} />}
+                      {msg.senderId === profile?.uid && <CheckCheck size={14} />}
                     </div>
                   </div>
                 </div>

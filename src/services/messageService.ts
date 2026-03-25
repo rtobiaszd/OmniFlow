@@ -1,20 +1,4 @@
-import { db } from '../lib/firebase';
-import { 
-  collection, 
-  doc, 
-  setDoc, 
-  getDocs, 
-  query, 
-  where, 
-  orderBy,
-  onSnapshot,
-  addDoc,
-  Timestamp
-} from 'firebase/firestore';
 import { Message } from '../types';
-
-const MESSAGES_COLLECTION = 'messages';
-const CONVERSATIONS_COLLECTION = 'conversations';
 
 export interface Conversation {
   id: string;
@@ -29,53 +13,48 @@ export interface Conversation {
   status: 'open' | 'closed';
 }
 
+const API_BASE = '/api';
+
 export const messageService = {
-  subscribeToConversations(tenantId: string, callback: (conversations: Conversation[]) => void) {
-    if (!db) return () => {};
-    const q = query(
-      collection(db, CONVERSATIONS_COLLECTION), 
-      where('tenantId', '==', tenantId),
-      orderBy('lastMessageTime', 'desc')
-    );
-    return onSnapshot(q, (snapshot) => {
-      const conversations = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Conversation));
-      callback(conversations);
-    });
+  async getConversations(tenantId: string): Promise<Conversation[]> {
+    const resp = await fetch(`${API_BASE}/conversations?tenantId=${tenantId}`);
+    if (!resp.ok) return [];
+    const json = await resp.json();
+    return json.success ? json.data : [];
   },
 
-  subscribeToMessages(tenantId: string, conversationId: string, callback: (messages: Message[]) => void) {
-    if (!db) return () => {};
-    const q = query(
-      collection(db, MESSAGES_COLLECTION), 
-      where('tenantId', '==', tenantId),
-      where('conversationId', '==', conversationId),
-      orderBy('timestamp', 'asc')
-    );
-    return onSnapshot(q, (snapshot) => {
-      const messages = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Message));
-      callback(messages);
-    });
+  async getMessages(conversationId: string): Promise<Message[]> {
+    const resp = await fetch(`${API_BASE}/conversations/${conversationId}/messages`);
+    if (!resp.ok) return [];
+    const json = await resp.json();
+    return json.success ? json.data : [];
   },
 
   async sendMessage(tenantId: string, conversationId: string, content: string, channel: string, senderId?: string) {
-    if (!db) return;
-    
-    const messageData: Omit<Message, 'id'> = {
-      conversationId,
-      tenantId,
-      content,
-      channel: channel as any,
-      timestamp: new Date().toISOString(),
-      senderId
-    };
+    const resp = await fetch(`${API_BASE}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tenantId, conversationId, content, channel, senderId })
+    });
+    return resp.json();
+  },
 
-    await addDoc(collection(db, MESSAGES_COLLECTION), messageData);
+  // Polling simulation for Real-time
+  subscribeToConversations(tenantId: string, callback: (conversations: Conversation[]) => void) {
+    const interval = setInterval(async () => {
+      const data = await this.getConversations(tenantId);
+      callback(data);
+    }, 5000);
+    this.getConversations(tenantId).then(callback);
+    return () => clearInterval(interval);
+  },
 
-    // Update conversation last message
-    const convRef = doc(db, CONVERSATIONS_COLLECTION, conversationId);
-    await setDoc(convRef, {
-      lastMessage: content,
-      lastMessageTime: new Date().toISOString()
-    }, { merge: true });
+  subscribeToMessages(tenantId: string, conversationId: string, callback: (messages: Message[]) => void) {
+    const interval = setInterval(async () => {
+      const data = await this.getMessages(conversationId);
+      callback(data);
+    }, 3000);
+    this.getMessages(conversationId).then(callback);
+    return () => clearInterval(interval);
   }
 };

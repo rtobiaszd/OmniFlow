@@ -1,72 +1,66 @@
-import { db } from '../lib/firebase';
-import { 
-  collection, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  getDocs, 
-  query, 
-  where, 
-  updateDoc, 
-  deleteDoc,
-  onSnapshot
-} from 'firebase/firestore';
 import { Integration } from '../types';
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
-const COLLECTION = 'integrations';
+const API_BASE = '/api/integrations';
 
 export const integrationService = {
   async getIntegrations(tenantId: string): Promise<Integration[]> {
-    if (!db) return [];
     try {
-      const q = query(collection(db, COLLECTION), where('tenantId', '==', tenantId));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ ...doc.data() } as Integration));
+      const resp = await fetch(`${API_BASE}?tenantId=${tenantId}`);
+      if (!resp.ok) throw new Error('Failed to fetch');
+      const data = await resp.json();
+      return data.data || [];
     } catch (error) {
-      handleFirestoreError(error, OperationType.LIST, COLLECTION);
+      console.error('API Error:', error);
       return [];
     }
   },
 
+  // Note: Subscription is simulated since we don't have WebSockets/live query in the new backend yet
+  // We'll just call the callback once, or better, the UI should poll or refreshen
   subscribeToIntegrations(tenantId: string, callback: (integrations: Integration[]) => void) {
-    if (!db) return () => {};
-    const q = query(collection(db, COLLECTION), where('tenantId', '==', tenantId));
-    return onSnapshot(q, (snapshot) => {
-      const integrations = snapshot.docs.map(doc => ({ ...doc.data() } as Integration));
-      callback(integrations);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, COLLECTION);
-    });
+    this.getIntegrations(tenantId).then(callback);
+    // Poll every 30s as a fallback for "real-time"
+    const interval = setInterval(() => {
+      this.getIntegrations(tenantId).then(callback);
+    }, 30000);
+    return () => clearInterval(interval);
   },
 
   async updateIntegration(integration: Partial<Integration> & { id: string }) {
-    if (!db) return;
-    const docRef = doc(db, COLLECTION, integration.id);
-    // Remove undefined values to prevent Firestore errors
-    const cleanData = Object.fromEntries(
-      Object.entries(integration).filter(([_, v]) => v !== undefined)
-    );
-    await updateDoc(docRef, cleanData);
+    const resp = await fetch(`${API_BASE}/${integration.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(integration)
+    });
+    return resp.ok;
   },
 
   async connectIntegration(tenantId: string, provider: Integration['provider'], name: string, config: Record<string, any> = {}) {
-    if (!db) return;
-    const id = `${tenantId}_${provider}`;
-    const integration: Integration = {
-      id,
+    const integration = {
+      id: `${tenantId}_${provider}`,
       tenantId,
       provider,
       name,
       status: 'connected',
+      active: true,
       config: { ...config, connectedAt: new Date().toISOString() }
     };
-    await setDoc(doc(db, COLLECTION, id), integration);
-    return integration;
+    
+    const resp = await fetch(API_BASE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(integration)
+    });
+    
+    if (!resp.ok) throw new Error('Failed to connect');
+    const result = await resp.json();
+    return result.data;
   },
 
   async disconnectIntegration(id: string) {
-    if (!db) return;
-    await deleteDoc(doc(db, COLLECTION, id));
+    const resp = await fetch(`${API_BASE}/${id}`, {
+      method: 'DELETE'
+    });
+    return resp.ok;
   }
 };

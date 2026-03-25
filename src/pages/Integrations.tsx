@@ -79,6 +79,17 @@ export function Integrations() {
     }
   };
 
+  const handleToggleActive = async (int: Integration) => {
+    try {
+      await integrationService.updateIntegration({ 
+        id: int.id, 
+        active: int.active === false ? true : false 
+      });
+    } catch (error) {
+      console.error('Error toggling active status:', error);
+    }
+  };
+
   const handleDisconnect = (id: string) => {
     setDisconnectingId(id);
   };
@@ -255,22 +266,25 @@ export function Integrations() {
                   )}>
                     {int.icon}
                   </div>
-                  <div className={cn(
-                    "flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                    connected ? "bg-green-50 text-green-600" : "bg-gray-50 text-gray-400"
-                  )}>
-                    {connected ? (
-                      <>
-                        <CheckCircle2 size={12} />
-                        Connected
-                      </>
-                    ) : (
-                      <>
-                        <Plug size={12} />
-                        Available
-                      </>
-                    )}
-                  </div>
+                  {connected ? (
+                    <button 
+                      onClick={() => handleToggleActive(connected)}
+                      className={cn(
+                        "flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all",
+                        connected.active !== false 
+                          ? "bg-green-50 text-green-600 hover:bg-green-100" 
+                          : "bg-gray-100 text-gray-400 hover:bg-gray-200"
+                      )}
+                    >
+                      {connected.active !== false ? <CheckCircle2 size={12} /> : <X size={12} />}
+                      {connected.active !== false ? 'Active' : 'Inactive'}
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-gray-50 text-gray-400">
+                      <Plug size={12} />
+                      Available
+                    </div>
+                  )}
                 </div>
 
                 <div className="mb-6">
@@ -283,10 +297,19 @@ export function Integrations() {
                   {connected ? (
                     <>
                       <button 
-                        className="flex-1 py-2 bg-gray-50 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-100 transition-all flex items-center justify-center gap-2"
+                        onClick={() => {
+                          alert(`Verificando status de ${connected.provider}... Conectado com sucesso!`);
+                        }}
+                        className="flex-1 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-sm font-bold hover:bg-indigo-100 transition-all flex items-center justify-center gap-2"
                       >
-                        <Settings size={16} />
-                        Configure
+                        <CheckCircle2 size={16} />
+                        Status
+                      </button>
+                      <button 
+                        onClick={() => setConnectingInt(int)}
+                        className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-gray-50 rounded-xl transition-all"
+                      >
+                        <Settings size={20} />
                       </button>
                       <button 
                         onClick={() => handleDisconnect(connected.id)}

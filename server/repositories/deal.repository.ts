@@ -1,36 +1,29 @@
-import { db } from "../db";
+import prisma from "../lib/prisma";
 import { Deal } from "../../src/types";
 import { IDealRepository } from "../interfaces/repository.interface";
 
 export class DealRepository implements IDealRepository {
   async findAll(): Promise<Deal[]> {
-    return db.deals;
+    return (await prisma.deal.findMany()) as any;
   }
 
   async findById(id: string): Promise<Deal | undefined> {
-    return db.deals.find(d => d.id === id);
+    return (await prisma.deal.findUnique({ where: { id } })) as any;
   }
 
   async create(deal: Deal): Promise<Deal> {
-    db.deals.push(deal);
-    return deal;
+    return (await prisma.deal.create({ data: deal as any })) as any;
   }
 
   async update(id: string, data: Partial<Deal>): Promise<Deal | undefined> {
-    const index = db.deals.findIndex(d => d.id === id);
-    if (index !== -1) {
-      db.deals[index] = { ...db.deals[index], ...data };
-      return db.deals[index];
-    }
-    return undefined;
+    return (await prisma.deal.update({
+      where: { id },
+      data: data as any
+    })) as any;
   }
 
   async delete(id: string): Promise<boolean> {
-    const index = db.deals.findIndex(d => d.id === id);
-    if (index !== -1) {
-      db.deals.splice(index, 1);
-      return true;
-    }
-    return false;
+    await prisma.deal.delete({ where: { id } });
+    return true;
   }
 }

@@ -31,4 +31,8 @@ export class DealService implements IDealService {
   async updateDeal(id: string, data: Partial<Deal>): Promise<Deal | undefined> {
     return this.dealRepo.update(id, data);
   }
+
+  async deleteDeal(id: string): Promise<boolean> {
+    return this.dealRepo.delete(id);
+  }
 }
