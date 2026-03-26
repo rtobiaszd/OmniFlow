@@ -263,45 +263,37 @@ function sanitizeModelOutput(raw) {
 
     return cleaned;
 }
-
-function parseJsonLoose(raw) {
+function parseJsonSafe(raw) {
     if (!raw) return null;
 
-    const cleaned = sanitizeModelOutput(raw);
+    let cleaned = raw
+        .replace(/```json/g, "")
+        .replace(/```/g, "")
+        .trim();
 
+    // tenta direto
     try {
         return JSON.parse(cleaned);
     } catch { }
 
-    const firstObj = cleaned.indexOf("{");
-    const lastObj = cleaned.lastIndexOf("}");
-    if (firstObj !== -1 && lastObj !== -1 && lastObj > firstObj) {
-        const candidate = cleaned.slice(firstObj, lastObj + 1);
-        try {
-            return JSON.parse(candidate);
-        } catch { }
-    }
+    // extrai primeiro JSON válido
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (!match) return null;
 
-    let repaired = cleaned;
+    let candidate = match[0];
 
-    repaired = repaired.replace(/:\s*`([\s\S]*?)`(?=\s*[,}])/g, (_, content) => {
-        return `: ${JSON.stringify(content)}`;
-    });
+    // tenta corrigir strings quebradas
+    candidate = candidate
+        .replace(/:\s*`([\s\S]*?)`/g, (_, c) => `: ${JSON.stringify(c)}`)
+        .replace(/\n/g, "\\n");
 
     try {
-        return JSON.parse(repaired);
-    } catch { }
-
-    const first = repaired.indexOf("{");
-    const last = repaired.lastIndexOf("}");
-    if (first !== -1 && last !== -1 && last > first) {
-        const candidate = repaired.slice(first, last + 1);
-        try {
-            return JSON.parse(candidate);
-        } catch { }
+        return JSON.parse(candidate);
+    } catch (e) {
+        console.log("❌ JSON final inválido:");
+        console.log(candidate.slice(0, 1000));
+        return null;
     }
-
-    return null;
 }
 
 /* ========================= LOCK ========================= */

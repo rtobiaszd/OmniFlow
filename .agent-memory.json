@@ -1,0 +1,55 @@
+{
+  "repoHash": "764a59636ab36cc28ccd9197eb5e0fa8d2dac321",
+  "blueprintHash": "a1f7dae09643c8cd1e5222681156623df71e2549",
+  "backlog": [
+    {
+      "id": "task-4",
+      "title": "Add Unit Tests for Email Service Functions",
+      "category": "tests|product",
+      "priority": "high",
+      "goal": "Create comprehensive unit tests to ensure that the email service functions behave as expected under various scenarios.",
+      "why": "Unit testing is essential for maintaining code quality and identifying potential issues before they impact users.",
+      "files": [],
+      "new_files_allowed": true,
+      "commit_message": "test(mail): add unit tests for email service functions"
+    }
+  ],
+  "accepted": [],
+  "failed": [],
+  "skipped": [],
+  "history": [
+    {
+      "at": "2026-03-26T20:33:11.428Z",
+      "type": "backlog_generated",
+      "total": 1,
+      "summary": "This repository appears to be a full-featured CRM or communication tool with a focus on email integration and customer conversation management. It leverages Node.js, Express, Prisma, and various other libraries for backend functionality."
+    }
+  ],
+  "learned": {
+    "successfulTaskSignatures": [],
+    "failedTaskSignatures": [],
+    "successfulCommitMessages": [],
+    "forbiddenKeywordsObserved": [],
+    "lintPatterns": [],
+    "buildPatterns": [],
+    "testPatterns": []
+  },
+  "metrics": {
+    "iterations": 1,
+    "plannerRuns": 1,
+    "tasksExecuted": 1,
+    "approvals": 1,
+    "rejections": 0,
+    "applied": 1,
+    "commits": 0,
+    "pushes": 0,
+    "verifyPass": 0,
+    "verifyFail": 0,
+    "testPass": 0,
+    "testFail": 0,
+    "selfHealSuccess": 0,
+    "selfHealFail": 0,
+    "lastSuccessAt": null,
+    "lastErrorAt": null
+  }
+}
