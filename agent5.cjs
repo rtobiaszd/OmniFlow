@@ -37,7 +37,7 @@ const CONFIG = {
     MAX_HISTORY_ITEMS: Number(process.env.MAX_HISTORY_ITEMS || 300),
 
     MAX_REPEAT_FAILURES_PER_TASK: Number(process.env.MAX_REPEAT_FAILURES_PER_TASK || 2),
-    MAX_SELF_HEAL_ATTEMPTS: Number(process.env.MAX_SELF_HEAL_ATTEMPTS || 2),
+    MAX_SELF_HEAL_ATTEMPTS: Number(process.env.MAX_SELF_HEAL_ATTEMPTS || 8),
 
     ALLOW_NEW_FILES: String(process.env.ALLOW_NEW_FILES || "true").toLowerCase() === "true",
     ALLOW_DELETE_FILES: String(process.env.ALLOW_DELETE_FILES || "false").toLowerCase() === "true",
@@ -1002,7 +1002,7 @@ Return ONLY valid JSON:
 
 function buildSelfHealPrompt({ blueprint, task, implementation, failedSummary, currentFiles }) {
     return `
-You are a senior engineer fixing a failed implementation after lint/build/test failure.
+You are a senior engineer fixing a broken codebase.
 
 SOURCE OF TRUTH:
 ${blueprint.content}
@@ -1010,25 +1010,31 @@ ${blueprint.content}
 TASK:
 ${JSON.stringify(task, null, 2)}
 
-FAILED IMPLEMENTATION SUMMARY:
+PREVIOUS IMPLEMENTATION:
 ${JSON.stringify(implementation, null, 2)}
 
-FAILURE OUTPUT:
+FAILURE OUTPUT (VERY IMPORTANT):
 ${failedSummary}
 
 CURRENT FILES:
 ${currentFiles}
 
-RULES:
-- Fix only the failure
-- Keep same task scope
-- Preserve the original intent
-- Do not touch unrelated files
-- Output valid JSON only
-- You MAY use Javascript backticks (\`...\`) around the file content instead of double quotes to avoid escaping issues
+CRITICAL RULES:
+- You MUST fix ALL errors until the project builds successfully
+- Fix lint, type errors, runtime issues and tests
+- You are allowed to refactor the affected files if necessary
+- DO NOT stop at the first fix
+- Ensure the code PASSES:
+  - lint
+  - typecheck
+  - build
+  - tests
+- You can modify any file related to the failure
+- Keep changes minimal but COMPLETE
+- Do not introduce new frameworks
 - Do not touch protected files
 
-Return ONLY:
+RETURN ONLY VALID JSON:
 {
   "summary": "what was fixed",
   "files": [
@@ -1043,7 +1049,6 @@ Return ONLY:
 }
 `.trim();
 }
-
 /* ========================= TASK / PLAN VALIDATION ========================= */
 
 function detectForbiddenKeywordsInTask(task) {
@@ -1394,7 +1399,7 @@ function runVerification(memory) {
 }
 
 async function trySelfHeal({ blueprint, task, implementation, checks, memory }) {
-    const failedSummary = [
+    let failedSummary = [
         summarizeCommandFailures(checks.verifyResults),
         summarizeCommandFailures(checks.testResults)
     ].filter(Boolean).join("\n\n");
@@ -1436,6 +1441,11 @@ async function trySelfHeal({ blueprint, task, implementation, checks, memory }) 
         try {
             applyImplementation(fixedImpl);
             const newChecks = runVerification(memory);
+
+            let failedSummary = [
+                summarizeCommandFailures(newChecks.verifyResults),
+                summarizeCommandFailures(newChecks.testResults)
+            ].filter(Boolean).join("\n\n");
 
             if (newChecks.ok) {
                 memory.metrics.selfHealSuccess++;
@@ -1562,7 +1572,7 @@ async function main() {
                 memory.metrics.tasksExecuted++;
                 saveMemory(memory);
 
-                const implementation = await generateImplementation(task, blueprint, memory);
+                let implementation = await generateImplementation(task, blueprint, memory);
 
                 const touchedPaths = unique([
                     ...implementation.files.map((f) => normalizeSlashes(f.path)),
@@ -1617,20 +1627,37 @@ async function main() {
                 memory.metrics.approvals++;
                 saveMemory(memory);
 
+
                 let checks = runVerification(memory);
 
-                if (!checks.ok) {
+                let healAttempts = 0;
+                let currentImplementation = implementation;
+
+                while (!checks.ok && healAttempts < CONFIG.MAX_SELF_HEAL_ATTEMPTS) {
+                    healAttempts++;
+
+                    log(`🩹 healing loop ${healAttempts}/${CONFIG.MAX_SELF_HEAL_ATTEMPTS}`);
+
                     const healed = await trySelfHeal({
                         blueprint,
                         task,
-                        implementation,
+                        implementation: currentImplementation,
                         checks,
                         memory
                     });
 
-                    if (healed.ok) {
-                        log("🩹 self-heal fixed verify/test failure");
-                        checks = { ok: true, verifyResults: [], testResults: [] };
+                    if (!healed.ok) {
+                        break;
+                    }
+
+                    currentImplementation = healed.implementation;
+                    implementation = healed.implementation;
+
+                    checks = runVerification(memory);
+
+                    if (checks.ok) {
+                        log("✅ fully healed and verified");
+                        break;
                     }
                 }
 
@@ -1651,7 +1678,7 @@ async function main() {
 
                     rememberFailure(memory, task, failureReason);
 
-                    removeTaskFromBacklog(memory, task.id);
+                    //removeTaskFromBacklog(memory, task.id);
                     pushHistory(memory, {
                         type: "checks_failed",
                         id: task.id,
