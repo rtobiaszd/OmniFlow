@@ -266,32 +266,80 @@ function sanitizeModelOutput(raw) {
 function parseJsonSafe(raw) {
     if (!raw) return null;
 
-    let cleaned = raw
-        .replace(/```json/g, "")
-        .replace(/```/g, "")
-        .trim();
-
-    // tenta direto
     try {
-        return JSON.parse(cleaned);
-    } catch { }
+        // 1. limpa markdown
+        let cleaned = raw
+            .replace(/```json/g, "")
+            .replace(/```/g, "")
+            .trim();
 
-    // extrai primeiro JSON válido
-    const match = cleaned.match(/\{[\s\S]*\}/);
-    if (!match) return null;
+        // 2. tenta direto
+        try {
+            return JSON.parse(cleaned);
+        } catch { }
 
-    let candidate = match[0];
+        // 3. pega primeiro JSON válido
+        const match = cleaned.match(/\{[\s\S]*\}/);
+        if (!match) return null;
 
-    // tenta corrigir strings quebradas
-    candidate = candidate
-        .replace(/:\s*`([\s\S]*?)`/g, (_, c) => `: ${JSON.stringify(c)}`)
-        .replace(/\n/g, "\\n");
+        let candidate = match[0];
 
-    try {
+        // 4. remove trailing commas
+        candidate = candidate.replace(/,\s*([}\]])/g, "$1");
+
+        // 5. corrige strings com backticks
+        candidate = candidate.replace(/:\s*`([\s\S]*?)`/g, (_, c) => {
+            return ": " + JSON.stringify(c);
+        });
+
+        // 6. escapa quebras de linha
+        candidate = candidate.replace(/\n/g, "\\n");
+
+        // 7. tenta parse final
         return JSON.parse(candidate);
-    } catch (e) {
-        console.log("❌ JSON final inválido:");
-        console.log(candidate.slice(0, 1000));
+    } catch (err) {
+        console.log("❌ JSON inválido (debug):");
+        console.log(raw.slice(0, 1000));
+        return null;
+    }
+}
+function parseJsonSafe(raw) {
+    if (!raw) return null;
+
+    try {
+        // 1. limpa markdown
+        let cleaned = raw
+            .replace(/```json/g, "")
+            .replace(/```/g, "")
+            .trim();
+
+        // 2. tenta direto
+        try {
+            return JSON.parse(cleaned);
+        } catch { }
+
+        // 3. pega primeiro JSON válido
+        const match = cleaned.match(/\{[\s\S]*\}/);
+        if (!match) return null;
+
+        let candidate = match[0];
+
+        // 4. remove trailing commas
+        candidate = candidate.replace(/,\s*([}\]])/g, "$1");
+
+        // 5. corrige strings com backticks
+        candidate = candidate.replace(/:\s*`([\s\S]*?)`/g, (_, c) => {
+            return ": " + JSON.stringify(c);
+        });
+
+        // 6. escapa quebras de linha
+        candidate = candidate.replace(/\n/g, "\\n");
+
+        // 7. tenta parse final
+        return JSON.parse(candidate);
+    } catch (err) {
+        console.log("❌ JSON inválido (debug):");
+        console.log(raw.slice(0, 1000));
         return null;
     }
 }
@@ -1310,7 +1358,7 @@ async function askAndParseJson(model, prompt, label) {
     let lastRaw = "";
     for (let i = 1; i <= CONFIG.MAX_PARSE_RETRIES; i++) {
         lastRaw = await askModel(model, prompt);
-        const parsed = parseJsonLoose(lastRaw);
+        const parsed = parseJsonSafe(lastRaw);
         if (parsed) return parsed;
         log(`⚠️ falha ao parsear ${label}, tentativa ${i}/${CONFIG.MAX_PARSE_RETRIES}`);
     }
@@ -1343,6 +1391,10 @@ async function generateImplementation(task, blueprint, memory) {
     });
 
     const impl = await askAndParseJson(CONFIG.MODEL_EXECUTOR, prompt, "implementação");
+
+    if (!isValidImplementation(impl)) {
+        throw new Error("INVALID_IMPLEMENTATION_STRUCTURE");
+    }
     validateImplementation(impl, task);
 
     if (containsDangerousContent(impl)) {
