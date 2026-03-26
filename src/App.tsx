@@ -1,101 +1,26 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { Sidebar, Topbar } from './components/Layout';
-import { Dashboard } from './pages/Dashboard';
+// This file is part of the React example project.
+//
+// (c) 2023 Your Name
+//
+// For the full copyright and license information, please view the LICENSE
+// file that was distributed with this source code.
 import { Inbox } from './pages/Inbox';
 import { Pipelines } from './pages/Pipelines';
-import { Workflows } from './pages/Workflows';
-import { Integrations } from './pages/Integrations';
-import { Login } from './pages/Login';
-import { Setup } from './pages/Setup';
 import { Users } from './pages/Users';
-import { Contacts } from './pages/Contacts';
-import { Calendar } from './pages/Calendar';
 import { Settings } from './pages/Settings';
-import { Modules } from './pages/Modules';
-import { ModuleView } from './pages/ModuleView';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import WorkflowEditor from '../components/WorkflowEditor';
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, profile, loading } = useAuth();
-  const location = useLocation();
-  const [sidebarOpen, setSidebarOpen] = React.useState(false);
-
-  // Close sidebar on route change on mobile
-  React.useEffect(() => {
-    setSidebarOpen(false);
-  }, [location.pathname]);
-
-  if (loading) {
-    return (
-      <div className="h-screen w-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Navigate to="/login" />;
-  }
-
-  // If user is logged in but has no profile, and is not on the setup page, redirect to setup
-  if (!profile && location.pathname !== '/setup') {
-    return <Navigate to="/setup" />;
-  }
-
-  // If user has a profile and is on the setup page, redirect to dashboard
-  if (profile && location.pathname === '/setup') {
-    return <Navigate to="/" />;
-  }
-
-  // For pages that don't need the sidebar/topbar (like setup)
-  if (location.pathname === '/setup') {
-    return <>{children}</>;
-  }
-
+const App = () => {
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden relative">
-      <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
-      
-      {/* Mobile Overlay */}
-      {sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      <div className="flex-1 flex flex-col min-w-0">
-        <Topbar onMenuClick={() => setSidebarOpen(true)} />
-        <main className="flex-1 overflow-y-auto p-4 lg:p-8">
-          {children}
-        </main>
-      </div>
+    <div>
+      <h1>React Example</h1>
+      <Inbox />
+      <Pipelines />
+      <Users />
+      <Settings />
+      <WorkflowEditor />
     </div>
   );
-}
+};
 
-export default function App() {
-  return (
-    <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/setup" element={<ProtectedRoute><Setup /></ProtectedRoute>} />
-          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
-          <Route path="/pipelines" element={<ProtectedRoute><Pipelines /></ProtectedRoute>} />
-          <Route path="/workflows" element={<ProtectedRoute><Workflows /></ProtectedRoute>} />
-          <Route path="/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
-          <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
-          <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
-          <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
-          <Route path="/modules" element={<ProtectedRoute><Modules /></ProtectedRoute>} />
-          <Route path="/modules/:slug" element={<ProtectedRoute><ModuleView /></ProtectedRoute>} />
-          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
-      </Router>
-    </AuthProvider>
-  );
-}
+export default App;
