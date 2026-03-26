@@ -917,9 +917,9 @@ CRITICAL IMPLEMENTATION RULES:
 - Existing files must be fully rewritten in output
 - New files only if task justifies it
 - Output MUST be valid JSON
-- Do not use markdown fences
-- Do not use JavaScript template strings around file content
-- File content must be a normal JSON string
+- Do not use markdown fences inside the JSON syntax
+- CRITICAL: File content must be a valid JSON string. ALL internal double quotes must be escaped as \\"
+- You MAY use Javascript backticks (\`...\`) around the file content instead of double quotes to avoid escaping issues
 - NEVER modify or access these files:
   - agent3.cjs
   - agent4.cjs
@@ -1009,7 +1009,7 @@ RULES:
 - Preserve the original intent
 - Do not touch unrelated files
 - Output valid JSON only
-- Do not use template strings around content
+- You MAY use Javascript backticks (\`...\`) around the file content instead of double quotes to avoid escaping issues
 - Do not touch protected files
 
 Return ONLY:
