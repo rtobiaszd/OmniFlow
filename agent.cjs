@@ -1377,7 +1377,14 @@ async function generateBacklog(memory, blueprint, repoIndex) {
     const parsed = await askAndParseJson(CONFIG.MODEL_PLANNER, prompt, "backlog do planner");
     return validateBacklog(parsed, repoIndex, memory);
 }
-
+function isValidImplementation(impl) {
+    return (
+        impl &&
+        Array.isArray(impl.files) &&
+        impl.files.length > 0 &&
+        impl.files.every(f => f.path && f.content)
+    );
+}
 async function generateImplementation(task, blueprint, memory) {
     const fileContexts = collectContextsForTask(task);
     const commands = detectProjectCommands();
