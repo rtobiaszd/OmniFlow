@@ -119,7 +119,7 @@ function tooManyGlobalFailures(memory, err) {
     const sig = stableTextSignature(err.message || String(err));
 
     const count = memory.failed.filter(
-        f => f.signature === sig
+        f => f.signature === sig || f.error_signature === sig
     ).length;
 
     return count >= 3;
@@ -556,8 +556,24 @@ function pushBranch() {
 }
 
 function rollbackHard() {
+    const backup = new Map();
+    for (const p of CONFIG.PROTECTED_FILES) {
+        const full = abs(p);
+        if (exists(full)) {
+            backup.set(full, safeRead(full, ""));
+        }
+    }
+
     git("reset --hard", true);
     git("clean -fd", true);
+
+    for (const [full, content] of backup.entries()) {
+        try {
+            safeWrite(full, content);
+        } catch (e) {
+            log("⚠️ falha ao restaurar backup (em execução?):", full, e.message);
+        }
+    }
 }
 
 function diffWorkingTree() {
@@ -919,7 +935,7 @@ CRITICAL IMPLEMENTATION RULES:
 - Output MUST be valid JSON
 - Do not use markdown fences inside the JSON syntax
 - CRITICAL: File content must be a valid JSON string. ALL internal double quotes must be escaped as \\"
-- You MAY use Javascript backticks (\`...\`) around the file content instead of double quotes to avoid escaping issues
+- You MAY use Javascript backticks (\`...\`) around the file content instead of double quotes to avoid escaping issues. ALL internal double quotes must be escaped as \\"
 - NEVER modify or access these files:
   - agent3.cjs
   - agent4.cjs
@@ -1468,6 +1484,7 @@ async function main() {
 
             log("🧠 iteration", memory.metrics.iterations);
 
+            let task = null;
             try {
                 if (!Array.isArray(memory.backlog) || memory.backlog.length === 0) {
                     log("🗺️ generating backlog from blueprint...");
@@ -1482,7 +1499,7 @@ async function main() {
                     saveMemory(memory);
                 }
 
-                const task = pickNextTask(memory);
+                task = pickNextTask(memory);
 
                 if (!task) {
                     log("⏸️ no valid task available, regenerating backlog on next loop");
@@ -1696,14 +1713,28 @@ async function main() {
                 memory = loadMemory();
                 memory.metrics.lastErrorAt = new Date().toISOString();
 
-                memory.failed.unshift({
-                    at: new Date().toISOString(),
-                    reason: err.message || String(err),
-                    signature: stableTextSignature(err.message || String(err))
-                });
+                if (task) {
+                    memory.failed.unshift({
+                        at: new Date().toISOString(),
+                        id: task.id,
+                        title: task.title,
+                        reason: err.message || String(err),
+                        signature: stableTaskSignature(task),
+                        error_signature: stableTextSignature(err.message || String(err))
+                    });
+                    rememberFailure(memory, task, err.message || String(err));
+                    removeTaskFromBacklog(memory, task.id);
+                } else {
+                    memory.failed.unshift({
+                        at: new Date().toISOString(),
+                        reason: err.message || String(err),
+                        signature: stableTextSignature(err.message || String(err))
+                    });
+                }
 
                 pushHistory(memory, {
                     type: "fatal_iteration_error",
+                    id: task ? task.id : undefined,
                     reason: err.message || String(err)
                 });
 
