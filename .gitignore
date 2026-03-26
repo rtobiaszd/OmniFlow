@@ -8,3 +8,9 @@ coverage/
 !.env.example
 
 /src/generated/prisma
+agent*.cjs 
+.agent-* 
+agent*.cjs 
+.agent-* 
+agent*.cjs 
+.agent-* 
