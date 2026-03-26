@@ -195,6 +195,22 @@
         }
       ],
       "testResults": []
+    },
+    {
+      "task": {
+        "id": "fix-ts-extensions",
+        "title": "Fix TypeScript extension imports",
+        "category": "dx",
+        "priority": "high",
+        "goal": "Ensure correct file extensions for TypeScript imports",
+        "why": "Prevents import errors and improves code consistency",
+        "files": [
+          "src/main.tsx"
+        ],
+        "new_files_allowed": false,
+        "commit_message": "chore: fix TypeScript extension imports in main.tsx"
+      },
+      "error": "Unexpected end of JSON input"
     }
   ],
   "skipped": [],
@@ -395,7 +411,7 @@
     "testPatterns": []
   },
   "metrics": {
-    "iterations": 32,
+    "iterations": 34,
     "plannerRuns": 5,
     "tasksExecuted": 32,
     "approvals": 14,
