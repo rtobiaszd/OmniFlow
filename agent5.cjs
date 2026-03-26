@@ -29,7 +29,7 @@ const CONFIG = {
     MAX_ITERATIONS: Number(process.env.MAX_ITERATIONS || 999999),
     LOOP_DELAY_MS: Number(process.env.LOOP_DELAY_MS || 5000),
 
-    MAX_FILES_PER_TASK: Number(process.env.MAX_FILES_PER_TASK || 6),
+    MAX_FILES_PER_TASK: Number(process.env.MAX_FILES_PER_TASK || 12),
     MAX_CONTEXT_FILES: Number(process.env.MAX_CONTEXT_FILES || 24),
     MAX_FILE_CHARS: Number(process.env.MAX_FILE_CHARS || 15000),
     MAX_BLUEPRINT_CHARS: Number(process.env.MAX_BLUEPRINT_CHARS || 35000),
@@ -84,20 +84,14 @@ const CONFIG = {
     ],
 
     ALLOWED_EXTENSIONS: [
-        ".js",
-        ".cjs",
-        ".mjs",
-        ".ts",
-        ".tsx",
-        ".jsx",
-        ".json",
-        ".md",
-        ".yml",
-        ".yaml",
-        ".sql",
-        ".css",
-        ".scss",
-        ".prisma",
+        ".js", ".cjs", ".mjs", ".ts", ".tsx", ".jsx",
+        ".json", ".md", ".yml", ".yaml", ".sql",
+        ".css", ".scss", ".prisma",
+        ".env",
+        ".env.local",
+        ".env.development",
+        ".env.production",
+        ".env.test",
         ".env.example",
         ".html"
     ],
@@ -121,7 +115,15 @@ const CONFIG = {
 };
 
 /* ========================= BASIC UTILS ========================= */
+function tooManyGlobalFailures(memory, err) {
+    const sig = stableTextSignature(err.message || String(err));
 
+    const count = memory.failed.filter(
+        f => f.signature === sig
+    ).length;
+
+    return count >= 3;
+}
 function log(...args) {
     console.log(new Date().toISOString(), "-", ...args);
 }
@@ -246,7 +248,16 @@ function stableTaskSignature(task) {
 
     return sha1(JSON.stringify(payload));
 }
+function isTaskFeasible(task) {
+    const t = String(task.title || "").toLowerCase();
 
+    // exemplo de proteção
+    if (t.includes("environment") && !CONFIG.ALLOWED_EXTENSIONS.includes(".env")) {
+        return false;
+    }
+
+    return true;
+}
 function stableTextSignature(text) {
     return sha1(String(text || "").trim().toLowerCase());
 }
@@ -1093,7 +1104,7 @@ function validateImplementation(impl, task) {
         throw new Error("Implementação vazia.");
     }
 
-    if (impl.files.length > CONFIG.MAX_FILES_PER_TASK + 3) {
+    if (impl.files.length > CONFIG.MAX_FILES_PER_TASK + 6) {
         throw new Error("Implementação alterou arquivos demais.");
     }
 
@@ -1480,6 +1491,23 @@ async function main() {
                     await sleep(CONFIG.LOOP_DELAY_MS);
                     continue;
                 }
+                if (!isTaskFeasible(task)) {
+                    log("⚠️ skipping infeasible task:", task.title);
+
+                    memory.skipped.unshift({
+                        at: new Date().toISOString(),
+                        id: task.id,
+                        title: task.title,
+                        reason: "infeasible task",
+                        signature: stableTaskSignature(task)
+                    });
+
+                    removeTaskFromBacklog(memory, task.id);
+                    saveMemory(memory);
+
+                    await sleep(CONFIG.LOOP_DELAY_MS);
+                    continue;
+                }
 
                 if (wasTaskSuccessful(memory, task)) {
                     log("⚠️ skipping already successful task:", task.title);
@@ -1681,6 +1709,11 @@ async function main() {
 
                 saveMemory(memory);
                 log("💥 iteration fatal:", err.message || String(err));
+
+                if (tooManyGlobalFailures(memory, err)) {
+                    log("⛔ STOP: erro repetido detectado, evitando loop infinito");
+                    break;
+                }
 
                 try {
                     rollbackHard();
