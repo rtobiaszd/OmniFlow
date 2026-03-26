@@ -1,44 +1,7 @@
 {
-  "repoHash": "06c29b78edcedf630ade10756e232e7d3942bce6",
+  "repoHash": "9689784d3b96a51407095190a69ee000a30b7cf7",
   "blueprintHash": "a1f7dae09643c8cd1e5222681156623df71e2549",
   "backlog": [
-    {
-      "id": "perf-1",
-      "title": "Optimize Database Queries",
-      "category": "performance",
-      "priority": "high",
-      "goal": "Reduce database query execution time",
-      "why": "Optimizing queries will improve the overall performance of the application.",
-      "files": [
-        "server/lib/prisma.ts"
-      ],
-      "new_files_allowed": false,
-      "commit_message": "refactor(prisma): optimize database queries"
-    },
-    {
-      "id": "prod-1",
-      "title": "Add Environment-Specific Configuration Management",
-      "category": "product",
-      "priority": "medium",
-      "goal": "Allow for environment-specific configuration settings",
-      "why": "This will make it easier to manage configurations across different environments (development, testing, production).",
-      "files": [],
-      "new_files_allowed": true,
-      "commit_message": "feat(config): add environment-specific configuration management"
-    },
-    {
-      "id": "ref-1",
-      "title": "Refactor Workflow Service for better readability",
-      "category": "refactor",
-      "priority": "medium",
-      "goal": "Improve the readability and maintainability of the workflow service",
-      "why": "A cleaner codebase is easier to understand, debug, and scale.",
-      "files": [
-        "server/services/workflow.service.ts"
-      ],
-      "new_files_allowed": false,
-      "commit_message": "refactor(workflow-service): improve readability and maintainability"
-    },
     {
       "id": "dx-1",
       "title": "Create TypeScript Configuration for Better DX",
@@ -55,6 +18,30 @@
   ],
   "accepted": [],
   "failed": [
+    {
+      "at": "2026-03-26T19:40:24.523Z",
+      "id": "ref-1",
+      "title": "Refactor Workflow Service for better readability",
+      "goal": "Improve the readability and maintainability of the workflow service",
+      "reason": "The provided task does not match the current blueprint or previous tasks. The failed signatures indicate issues with linting and type errors, which need to be addressed before proceeding.",
+      "signature": "011ce6ee42bc2091a313981f4bfe210dabee87d0"
+    },
+    {
+      "at": "2026-03-26T19:39:58.038Z",
+      "id": "prod-1",
+      "title": "Add Environment-Specific Configuration Management",
+      "goal": "Allow for environment-specific configuration settings",
+      "reason": "Task signature does not match the provided task. The task ID and title in the memory do not correspond to the task being attempted.",
+      "signature": "1422d1c878ddb3241edc9732dbf0f10f26e6bf89"
+    },
+    {
+      "at": "2026-03-26T19:39:26.610Z",
+      "id": "perf-1",
+      "title": "Optimize Database Queries",
+      "goal": "Reduce database query execution time",
+      "reason": "verify/test failed\nCOMMAND: npm run lint\nSTDOUT:\n\n> react-example@0.0.0 lint\n> tsc --noEmit\n\nserver/lib/prisma.ts(28,38): error TS2322: Type '{ db: { url: string; }; }' is not assignable to type 'never'.\r\nserver/lib/prisma.ts(50,47): error TS2551: Property 'deals' does not exist on type 'PrismaClient<{ adapter: PrismaPg; datasources: { db: { url: string; }; }; }, never, DefaultArgs>'. Did you mean 'deal'?\r\nserver/lib/prisma.ts(51,46): error TS2551: Property 'deals' does not exist on type 'PrismaClient<{ adapter: PrismaPg; datasources: { db: { url: string; }; }; }, never, DefaultArgs>'. Did you mean 'deal'?\r\nserver/lib/prisma.ts(58,63): error TS2551: Property 'deals' does not exist on type 'PrismaClient<{ adapter: PrismaPg; datasources: { db: { url: string; }; }; }, never, DefaultArgs>'. Did you mean 'deal'?\r\nserver/services/stats.service.ts(11,45): error TS2339: Property 'findAll' does not exist on type 'MessageRepository'.\r\nsrc/pages/Pipelines.tsx(93,29): error TS2339: Property 'name' does not exist on type 'UserProfile'.\r\nsrc/pages/Pipelines.tsx(475,55): error TS2345: Argument of type 'MouseEvent | PointerEvent | TouchEvent' is not assignable to parameter of type 'DragEvent<Element>'.\r\n  Type 'MouseEvent' is missing the following properties from type 'DragEvent<Element>': dataTransfer, nativeEvent, isDefaultPrevented, isPropagationStopped, persist\r\nsrc/pages/Settings.tsx(124,29): error TS2322: Type '{ className: string; }' is not assignable to type 'IntrinsicAttributes'.\r\n  Property 'className' does not exist on type 'IntrinsicAttributes'.\r\nsrc/pages/Users.tsx(299,30): error TS2339: Property 'status' does not exist on type 'UserProfile'.\r\nsrc/pages/Users.tsx(303,31): error TS2339: Property 'status' does not exist on type 'UserProfile'.\r\n\nSTDERR:\n(empty)",
+      "signature": "05f111a4726ec0e391cc164b7bc4cd8de27fbfc5"
+    },
     {
       "at": "2026-03-26T19:09:05.719Z",
       "id": "bug-1",
@@ -93,6 +80,26 @@
   "skipped": [],
   "history": [
     {
+      "at": "2026-03-26T19:40:24.523Z",
+      "type": "task_rejected",
+      "id": "ref-1",
+      "title": "Refactor Workflow Service for better readability",
+      "reason": "The provided task does not match the current blueprint or previous tasks. The failed signatures indicate issues with linting and type errors, which need to be addressed before proceeding."
+    },
+    {
+      "at": "2026-03-26T19:39:58.038Z",
+      "type": "task_rejected",
+      "id": "prod-1",
+      "title": "Add Environment-Specific Configuration Management",
+      "reason": "Task signature does not match the provided task. The task ID and title in the memory do not correspond to the task being attempted."
+    },
+    {
+      "at": "2026-03-26T19:39:26.611Z",
+      "type": "checks_failed",
+      "id": "perf-1",
+      "title": "Optimize Database Queries"
+    },
+    {
       "at": "2026-03-26T19:09:05.719Z",
       "type": "checks_failed",
       "id": "bug-1",
@@ -113,28 +120,35 @@
   ],
   "learned": {
     "successfulTaskSignatures": [],
-    "failedTaskSignatures": [],
+    "failedTaskSignatures": [
+      "011ce6ee42bc2091a313981f4bfe210dabee87d0",
+      "1422d1c878ddb3241edc9732dbf0f10f26e6bf89",
+      "05f111a4726ec0e391cc164b7bc4cd8de27fbfc5"
+    ],
     "successfulCommitMessages": [],
     "forbiddenKeywordsObserved": [],
-    "lintPatterns": [],
+    "lintPatterns": [
+      "The provided task does not match the current blueprint or previous tasks. The failed signatures indicate issues with linting and type errors, which need to be addressed before proceeding.",
+      "verify/test failed\nCOMMAND: npm run lint\nSTDOUT:\n\n> react-example@0.0.0 lint\n> tsc --noEmit\n\nserver/lib/prisma.ts(28,38): error TS2322: Type '{ db: { url: string; }; }' is not assignable to type 'never'.\r\nserver/lib/prisma.ts(50,47): error TS2551: Property 'deals' does not exist on type 'PrismaClient<{ adapter: PrismaPg; datasources: { db: { url: string; }; }; }, never, DefaultArgs>'. Did you mean 'deal'?\r\nserver/lib/prisma.ts(51,46): error TS2551: Property 'deals' does not exist on type 'PrismaClient<{ adapter: PrismaPg; datasources: { db: { url: string; }; }; }, never, DefaultArgs>'. Did you mean 'deal'?\r\nserver/lib/prisma.ts(58,63): error TS2551: Property 'deals' does not exist on type 'PrismaClient<{ adapter: PrismaPg; datasources: { db: { url: string; }; }; }, never, DefaultArgs>'. Did you mean 'deal'?\r\nserver/services/stats.service.ts(11,45): error TS2339: Property 'findAll' does not exist on type 'MessageRepository'.\r\nsrc/pages/Pipelines.tsx(93,29): error TS2339: Property 'name' does not exist on type 'UserProfile'.\r\nsrc/pages/Pipelines.tsx(475,55): error TS2345: Argument of type 'MouseEvent | PointerEvent | TouchEvent' is not assignable to parameter of type 'DragEvent<Element>'.\r\n  Type 'MouseEvent' is missing the following properties from type 'DragEvent<Element>': dataTransfer, nativeEvent, isDefaultPrevented, isPropagationStopped, persist\r\nsrc/pages/Settings.tsx(124,29): error TS2322: Type '{ className: string; }' is not assignable to type 'IntrinsicAttributes'.\r\n  Property 'className' does not exist on type 'IntrinsicAttributes'.\r\nsrc/pages/Users.tsx(299,30): error TS2339: Property 'status' does not exist on type 'UserProfile'.\r\nsrc/pages/Users.tsx(303,31): error TS2339: Property 'status' does not exist on type 'UserProfile'.\r\n\nSTDERR:\n(empty)"
+    ],
     "buildPatterns": [],
     "testPatterns": []
   },
   "metrics": {
-    "iterations": 6,
+    "iterations": 10,
     "plannerRuns": 1,
-    "tasksExecuted": 6,
-    "approvals": 4,
-    "rejections": 0,
-    "applied": 4,
+    "tasksExecuted": 10,
+    "approvals": 5,
+    "rejections": 2,
+    "applied": 7,
     "commits": 0,
     "pushes": 0,
     "verifyPass": 0,
-    "verifyFail": 2,
-    "testPass": 2,
+    "verifyFail": 5,
+    "testPass": 5,
     "testFail": 0,
     "selfHealSuccess": 0,
-    "selfHealFail": 0,
+    "selfHealFail": 1,
     "lastSuccessAt": null,
     "lastErrorAt": null
   }
