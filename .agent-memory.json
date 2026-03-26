@@ -1,6 +1,6 @@
 {
-  "repoHash": "",
-  "blueprintHash": "",
+  "repoHash": "06c29b78edcedf630ade10756e232e7d3942bce6",
+  "blueprintHash": "a1f7dae09643c8cd1e5222681156623df71e2549",
   "backlog": [
     {
       "id": "perf-1",
@@ -111,10 +111,19 @@
       "summary": "The repository contains a mix of backend services and database operations. The goal is to improve security, performance, product functionality, and ensure comprehensive testing."
     }
   ],
+  "learned": {
+    "successfulTaskSignatures": [],
+    "failedTaskSignatures": [],
+    "successfulCommitMessages": [],
+    "forbiddenKeywordsObserved": [],
+    "lintPatterns": [],
+    "buildPatterns": [],
+    "testPatterns": []
+  },
   "metrics": {
-    "iterations": 3,
+    "iterations": 4,
     "plannerRuns": 1,
-    "tasksExecuted": 3,
+    "tasksExecuted": 4,
     "approvals": 3,
     "rejections": 0,
     "applied": 3,
@@ -124,6 +133,8 @@
     "verifyFail": 2,
     "testPass": 2,
     "testFail": 0,
+    "selfHealSuccess": 0,
+    "selfHealFail": 0,
     "lastSuccessAt": null,
     "lastErrorAt": null
   }
