@@ -39,3 +39,36 @@
 - **Phase 1**: Core Inbox, WhatsApp/Email integration, Basic Kanban Pipeline.
 - **Phase 2**: Visual Workflow Builder, AI Auto-responder.
 - **Phase 3**: Advanced Integrations (Jira/GitHub), Analytics Dashboard.
+
+
+## STACK REAL
+- Node.js
+- NestJS
+- PostgreSQL
+- TypeORM
+
+## NÃO USAR
+- Firebase
+- Express puro
+- MongoDB
+
+## ARQUITETURA
+- Controllers -> Services -> Repositories
+- Nunca lógica no controller
+
+## PADRÕES
+- DTO obrigatório
+- validação com class-validator
+
+## PROBLEMAS ATUAIS
+- [ ] bug X
+- [ ] performance Y
+
+## ÁREAS PRIORITÁRIAS
+- reports
+- integrations
+- auth
+
+## REGRAS CRÍTICAS
+- não criar novos frameworks
+- não alterar estrutura base
