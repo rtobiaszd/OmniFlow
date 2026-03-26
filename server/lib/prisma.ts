@@ -21,15 +21,13 @@ const prismaClientSingleton = () => {
   });
 
   const adapter = new PrismaPg(pool as any);
-  return new PrismaClient({ adapter });
+  return new PrismaClient({ adapter, datasources: { db: { url: connectionString } } });
 };
 
 declare global {
   var prisma: undefined | ReturnType<typeof prismaClientSingleton>;
 }
 
-const prisma = globalThis.prisma ?? prismaClientSingleton();
+globalThis.prisma = globalThis.prisma ?? prismaClientSingleton();
 
-export default prisma;
-
-if (process.env.NODE_ENV !== 'production') globalThis.prisma = prisma;
+export default globalThis.prisma;
