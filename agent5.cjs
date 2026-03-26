@@ -19,6 +19,7 @@ const CONFIG = {
     MODEL_PLANNER: process.env.MODEL_PLANNER || "qwen2.5-coder:7b",
     MODEL_EXECUTOR: process.env.MODEL_EXECUTOR || "qwen2.5-coder:7b",
     MODEL_REVIEWER: process.env.MODEL_REVIEWER || "qwen2.5-coder:7b",
+    MODEL_FIXER: process.env.MODEL_FIXER || "qwen2.5-coder:7b",
 
     REMOTE_NAME: process.env.REMOTE_NAME || "origin",
     AUTO_PUSH: String(process.env.AUTO_PUSH || "true").toLowerCase() === "true",
@@ -27,16 +28,21 @@ const CONFIG = {
 
     MAX_ITERATIONS: Number(process.env.MAX_ITERATIONS || 999999),
     LOOP_DELAY_MS: Number(process.env.LOOP_DELAY_MS || 5000),
+
     MAX_FILES_PER_TASK: Number(process.env.MAX_FILES_PER_TASK || 6),
-    MAX_CONTEXT_FILES: Number(process.env.MAX_CONTEXT_FILES || 20),
-    MAX_FILE_CHARS: Number(process.env.MAX_FILE_CHARS || 14000),
-    MAX_BLUEPRINT_CHARS: Number(process.env.MAX_BLUEPRINT_CHARS || 30000),
+    MAX_CONTEXT_FILES: Number(process.env.MAX_CONTEXT_FILES || 24),
+    MAX_FILE_CHARS: Number(process.env.MAX_FILE_CHARS || 15000),
+    MAX_BLUEPRINT_CHARS: Number(process.env.MAX_BLUEPRINT_CHARS || 35000),
     MAX_BACKLOG_ITEMS: Number(process.env.MAX_BACKLOG_ITEMS || 20),
-    MAX_HISTORY_ITEMS: Number(process.env.MAX_HISTORY_ITEMS || 200),
+    MAX_HISTORY_ITEMS: Number(process.env.MAX_HISTORY_ITEMS || 300),
+
+    MAX_REPEAT_FAILURES_PER_TASK: Number(process.env.MAX_REPEAT_FAILURES_PER_TASK || 2),
+    MAX_SELF_HEAL_ATTEMPTS: Number(process.env.MAX_SELF_HEAL_ATTEMPTS || 2),
 
     ALLOW_NEW_FILES: String(process.env.ALLOW_NEW_FILES || "true").toLowerCase() === "true",
     ALLOW_DELETE_FILES: String(process.env.ALLOW_DELETE_FILES || "false").toLowerCase() === "true",
     STRICT_CLEAN_START: String(process.env.STRICT_CLEAN_START || "true").toLowerCase() === "true",
+    IGNORE_UNTRACKED_PROTECTED_FILES_ONLY: String(process.env.IGNORE_UNTRACKED_PROTECTED_FILES_ONLY || "true").toLowerCase() === "true",
     DEBUG: String(process.env.DEBUG || "false").toLowerCase() === "true",
 
     IGNORE_DIRS: [
@@ -61,7 +67,20 @@ const CONFIG = {
         ".agent-memory.json",
         ".agent-snapshot.json",
         "tmp.patch",
-        'agent5.cjs'
+        "agent3.cjs",
+        "agent4.cjs",
+        "agent5.cjs"
+    ],
+
+    PROTECTED_FILES: [
+        ".agent-lock",
+        ".agent-memory.json",
+        ".agent-snapshot.json",
+        "tmp.patch",
+        "agent3.cjs",
+        "agent4.cjs",
+        "agent5.cjs",
+        "BLUEPRINT.md"
     ],
 
     ALLOWED_EXTENSIONS: [
@@ -82,6 +101,23 @@ const CONFIG = {
         ".env.example",
         ".html"
     ],
+
+    FORBIDDEN_TECH_KEYWORDS: [
+        "firebase",
+        "firebase admin sdk",
+        "mongo",
+        "mongodb",
+        "mongoose",
+        "fastify",
+        "koa",
+        "hapi",
+        "django",
+        "flask",
+        "rails",
+        "laravel",
+        "supabase",
+        "graphql"
+    ]
 };
 
 /* ========================= BASIC UTILS ========================= */
@@ -129,8 +165,8 @@ function normalizeSlashes(p) {
     return String(p).replace(/\\/g, "/");
 }
 
-function rel(abs) {
-    return normalizeSlashes(path.relative(CONFIG.REPO_PATH, abs));
+function rel(absPath) {
+    return normalizeSlashes(path.relative(CONFIG.REPO_PATH, absPath));
 }
 
 function abs(relPath) {
@@ -161,37 +197,6 @@ function stripCodeFence(text) {
         .trim();
 }
 
-function parseJsonLoose(raw) {
-    if (!raw) return null;
-
-    let cleaned = stripCodeFence(raw);
-
-    // 🔥 remove backticks perigosos
-    cleaned = cleaned.replace(/`/g, '"');
-
-    try {
-        return JSON.parse(cleaned);
-    } catch { }
-
-    // fallback agressivo
-    try {
-        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            return JSON.parse(jsonMatch[0].replace(/`/g, '"'));
-        }
-    } catch { }
-
-    return null;
-}
-
-function nowDate() {
-    const d = new Date();
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}`;
-}
-
 function isIgnoredDir(name) {
     return CONFIG.IGNORE_DIRS.includes(name);
 }
@@ -216,6 +221,97 @@ function fileLooksText(p) {
     } catch {
         return false;
     }
+}
+
+function isProtectedFile(filePath) {
+    const normalized = normalizeSlashes(filePath).toLowerCase();
+    return CONFIG.PROTECTED_FILES.some((p) => normalized.endsWith(p.toLowerCase()));
+}
+
+function nowDate() {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+}
+
+function stableTaskSignature(task) {
+    const payload = {
+        title: String(task?.title || ""),
+        category: String(task?.category || ""),
+        goal: String(task?.goal || ""),
+        files: Array.isArray(task?.files) ? [...task.files].sort() : []
+    };
+
+    return sha1(JSON.stringify(payload));
+}
+
+function stableTextSignature(text) {
+    return sha1(String(text || "").trim().toLowerCase());
+}
+
+/* ========================= JSON PARSER ========================= */
+
+function sanitizeModelOutput(raw) {
+    if (!raw) return "";
+    let cleaned = stripCodeFence(raw).trim();
+
+    // remove BOM
+    cleaned = cleaned.replace(/^\uFEFF/, "");
+
+    // normalize smart quotes
+    cleaned = cleaned
+        .replace(/[“”]/g, '"')
+        .replace(/[‘’]/g, "'");
+
+    return cleaned;
+}
+
+function parseJsonLoose(raw) {
+    if (!raw) return null;
+
+    const cleaned = sanitizeModelOutput(raw);
+
+    // try exact parse
+    try {
+        return JSON.parse(cleaned);
+    } catch { }
+
+    // try extracting first JSON object
+    const firstObj = cleaned.indexOf("{");
+    const lastObj = cleaned.lastIndexOf("}");
+    if (firstObj !== -1 && lastObj !== -1 && lastObj > firstObj) {
+        const candidate = cleaned.slice(firstObj, lastObj + 1);
+        try {
+            return JSON.parse(candidate);
+        } catch { }
+    }
+
+    // aggressive fallback:
+    // convert template-string wrapped content values into JSON strings
+    let repaired = cleaned;
+
+    // replace : `...` with : "..."
+    repaired = repaired.replace(/:\s*`([\s\S]*?)`(?=\s*[,}])/g, (_, content) => {
+        return `: ${JSON.stringify(content)}`;
+    });
+
+    // replace multiline raw content fields missing JSON escaping
+    try {
+        return JSON.parse(repaired);
+    } catch { }
+
+    const first = repaired.indexOf("{");
+    const last = repaired.lastIndexOf("}");
+    if (first !== -1 && last !== -1 && last > first) {
+        const candidate = repaired.slice(first, last + 1);
+        try {
+            return JSON.parse(candidate);
+        } catch { }
+    }
+
+    return null;
 }
 
 /* ========================= LOCK ========================= */
@@ -252,6 +348,15 @@ function createMemory() {
         failed: [],
         skipped: [],
         history: [],
+        learned: {
+            successfulTaskSignatures: [],
+            failedTaskSignatures: [],
+            successfulCommitMessages: [],
+            forbiddenKeywordsObserved: [],
+            lintPatterns: [],
+            buildPatterns: [],
+            testPatterns: []
+        },
         metrics: {
             iterations: 0,
             plannerRuns: 0,
@@ -265,6 +370,8 @@ function createMemory() {
             verifyFail: 0,
             testPass: 0,
             testFail: 0,
+            selfHealSuccess: 0,
+            selfHealFail: 0,
             lastSuccessAt: null,
             lastErrorAt: null
         }
@@ -283,6 +390,17 @@ function sanitizeMemory(raw) {
         failed: Array.isArray(m.failed) ? m.failed : [],
         skipped: Array.isArray(m.skipped) ? m.skipped : [],
         history: Array.isArray(m.history) ? m.history : [],
+        learned: {
+            ...base.learned,
+            ...(m.learned || {}),
+            successfulTaskSignatures: Array.isArray(m?.learned?.successfulTaskSignatures) ? m.learned.successfulTaskSignatures : [],
+            failedTaskSignatures: Array.isArray(m?.learned?.failedTaskSignatures) ? m.learned.failedTaskSignatures : [],
+            successfulCommitMessages: Array.isArray(m?.learned?.successfulCommitMessages) ? m.learned.successfulCommitMessages : [],
+            forbiddenKeywordsObserved: Array.isArray(m?.learned?.forbiddenKeywordsObserved) ? m.learned.forbiddenKeywordsObserved : [],
+            lintPatterns: Array.isArray(m?.learned?.lintPatterns) ? m.learned.lintPatterns : [],
+            buildPatterns: Array.isArray(m?.learned?.buildPatterns) ? m.learned.buildPatterns : [],
+            testPatterns: Array.isArray(m?.learned?.testPatterns) ? m.learned.testPatterns : []
+        },
         metrics: {
             ...base.metrics,
             ...(m.metrics || {}),
@@ -298,6 +416,8 @@ function sanitizeMemory(raw) {
             verifyFail: Number(m?.metrics?.verifyFail || 0),
             testPass: Number(m?.metrics?.testPass || 0),
             testFail: Number(m?.metrics?.testFail || 0),
+            selfHealSuccess: Number(m?.metrics?.selfHealSuccess || 0),
+            selfHealFail: Number(m?.metrics?.selfHealFail || 0)
         }
     };
 }
@@ -328,6 +448,41 @@ function pushHistory(memory, item) {
     }
 }
 
+function rememberSuccess(memory, task, commitMessage) {
+    const signature = stableTaskSignature(task);
+    if (!memory.learned.successfulTaskSignatures.includes(signature)) {
+        memory.learned.successfulTaskSignatures.unshift(signature);
+    }
+    memory.learned.successfulTaskSignatures = memory.learned.successfulTaskSignatures.slice(0, 200);
+
+    if (commitMessage && !memory.learned.successfulCommitMessages.includes(commitMessage)) {
+        memory.learned.successfulCommitMessages.unshift(commitMessage);
+    }
+    memory.learned.successfulCommitMessages = memory.learned.successfulCommitMessages.slice(0, 100);
+}
+
+function rememberFailure(memory, task, reason) {
+    const signature = stableTaskSignature(task);
+    if (!memory.learned.failedTaskSignatures.includes(signature)) {
+        memory.learned.failedTaskSignatures.unshift(signature);
+    }
+    memory.learned.failedTaskSignatures = memory.learned.failedTaskSignatures.slice(0, 200);
+
+    if (reason) {
+        const low = String(reason).toLowerCase();
+        if (low.includes("lint")) {
+            memory.learned.lintPatterns.unshift(reason);
+            memory.learned.lintPatterns = memory.learned.lintPatterns.slice(0, 50);
+        } else if (low.includes("build") || low.includes("typecheck")) {
+            memory.learned.buildPatterns.unshift(reason);
+            memory.learned.buildPatterns = memory.learned.buildPatterns.slice(0, 50);
+        } else if (low.includes("test")) {
+            memory.learned.testPatterns.unshift(reason);
+            memory.learned.testPatterns = memory.learned.testPatterns.slice(0, 50);
+        }
+    }
+}
+
 /* ========================= SHELL / GIT ========================= */
 
 function run(command, options = {}) {
@@ -336,7 +491,7 @@ function run(command, options = {}) {
         shell: true,
         encoding: "utf8",
         stdio: "pipe",
-        maxBuffer: 1024 * 1024 * 25
+        maxBuffer: 1024 * 1024 * 40
     });
 
     return {
@@ -360,29 +515,8 @@ function hasGitRepo() {
     return res.ok && String(res.stdout).trim() === "true";
 }
 
-function workingTreeDirty() {
-    return Boolean(git("status --porcelain", true).trim());
-}
-
 function currentBranch() {
     return git("rev-parse --abbrev-ref HEAD", true) || "unknown";
-}
-
-function ensureBranch() {
-    if (!CONFIG.AUTO_BRANCH) return currentBranch();
-
-    const target = `${CONFIG.BRANCH_PREFIX}/${nowDate()}`;
-    const current = currentBranch();
-    if (current === target) return current;
-
-    const existsBranch = run(`git rev-parse --verify ${target}`).ok;
-    if (existsBranch) {
-        git(`checkout ${target}`);
-        return target;
-    }
-
-    git(`checkout -b ${target}`);
-    return target;
 }
 
 function stageAll() {
@@ -419,6 +553,51 @@ function diffWorkingTree() {
     return git("diff -- .", true);
 }
 
+function ensureBranch() {
+    if (!CONFIG.AUTO_BRANCH) return currentBranch();
+
+    const target = `${CONFIG.BRANCH_PREFIX}/${nowDate()}`;
+    const current = currentBranch();
+    if (current === target) return current;
+
+    const existsBranch = run(`git rev-parse --verify ${target}`).ok;
+    if (existsBranch) {
+        git(`checkout ${target}`);
+        return target;
+    }
+
+    git(`checkout -b ${target}`);
+    return target;
+}
+
+function getUntrackedFiles() {
+    const out = git("ls-files --others --exclude-standard", true);
+    return out ? out.split(/\r?\n/).map((x) => x.trim()).filter(Boolean) : [];
+}
+
+function getStatusPorcelain() {
+    const out = git("status --porcelain", true);
+    return out ? out.split(/\r?\n/).filter(Boolean) : [];
+}
+
+function workingTreeDirty() {
+    const lines = getStatusPorcelain();
+    if (!lines.length) return false;
+
+    if (!CONFIG.IGNORE_UNTRACKED_PROTECTED_FILES_ONLY) return true;
+
+    for (const line of lines) {
+        const candidate = line.slice(3).trim();
+        const isUntracked = line.startsWith("??");
+        if (isUntracked && isProtectedFile(candidate)) {
+            continue;
+        }
+        return true;
+    }
+
+    return false;
+}
+
 /* ========================= REPO SCAN ========================= */
 
 function walkFiles(dir, list = []) {
@@ -450,12 +629,11 @@ function walkFiles(dir, list = []) {
 
 function buildRepoIndex() {
     const files = walkFiles(CONFIG.REPO_PATH);
-    const rels = files.map(rel).sort();
+    const rels = files.map(rel).filter((p) => !isProtectedFile(p)).sort();
 
     const importantNames = [
         "package.json",
         "README.md",
-        CONFIG.BLUEPRINT_FILE,
         "tsconfig.json",
         "jsconfig.json",
         "next.config.js",
@@ -471,11 +649,12 @@ function buildRepoIndex() {
 
     for (const name of importantNames) {
         const found = files.find((f) => rel(f).toLowerCase() === name.toLowerCase());
-        if (found) importantFiles.push(found);
+        if (found && !isProtectedFile(rel(found))) importantFiles.push(found);
     }
 
     const codeFiles = files.filter((f) => {
         const r = rel(f);
+        if (isProtectedFile(r)) return false;
         return /src\/|app\/|server\/|routes\/|controllers\/|services\/|components\/|pages\/|lib\/|utils\//i.test(r);
     });
 
@@ -516,17 +695,23 @@ function loadBlueprint() {
 function buildRepoSnapshot(index) {
     const packageJsonPath = path.join(CONFIG.REPO_PATH, "package.json");
     let packageSummary = "package.json não encontrado";
+    let dependencySummary = [];
 
     if (exists(packageJsonPath)) {
         try {
             const pkg = JSON.parse(safeRead(packageJsonPath, "{}"));
+            dependencySummary = [
+                ...Object.keys(pkg.dependencies || {}),
+                ...Object.keys(pkg.devDependencies || {})
+            ];
+
             packageSummary = JSON.stringify({
                 name: pkg.name || null,
                 version: pkg.version || null,
                 type: pkg.type || null,
                 scripts: pkg.scripts || {},
-                dependencies: pkg.dependencies ? Object.keys(pkg.dependencies).slice(0, 60) : [],
-                devDependencies: pkg.devDependencies ? Object.keys(pkg.devDependencies).slice(0, 60) : []
+                dependencies: Object.keys(pkg.dependencies || {}).slice(0, 80),
+                devDependencies: Object.keys(pkg.devDependencies || {}).slice(0, 80)
             }, null, 2);
         } catch {
             packageSummary = truncate(safeRead(packageJsonPath, ""));
@@ -537,6 +722,7 @@ function buildRepoSnapshot(index) {
 
     return {
         packageSummary,
+        dependencySummary,
         fileList: index.rels.slice(0, 1200).join("\n"),
         fileContexts
     };
@@ -582,14 +768,26 @@ function runCommands(commands, label) {
             command: cmd,
             ok: res.ok,
             code: res.code,
-            stdout: truncate(res.stdout, 20000),
-            stderr: truncate(res.stderr, 20000)
+            stdout: truncate(res.stdout, 30000),
+            stderr: truncate(res.stderr, 30000)
         });
 
         if (!res.ok) break;
     }
 
     return outputs;
+}
+
+function summarizeCommandFailures(results) {
+    const failed = results.find((r) => !r.ok);
+    if (!failed) return "";
+    return [
+        `COMMAND: ${failed.command}`,
+        `STDOUT:`,
+        failed.stdout || "(empty)",
+        `STDERR:`,
+        failed.stderr || "(empty)"
+    ].join("\n");
 }
 
 /* ========================= AI ========================= */
@@ -615,8 +813,8 @@ function buildBacklogPlannerPrompt({ blueprint, snapshot, memory, branch }) {
 You are an autonomous principal software engineer evolving a real production system.
 
 SOURCE OF TRUTH:
-The blueprint below defines the product, architecture, business goals, and expected evolution.
-You must obey it.
+The blueprint below defines the product, architecture, goals, and constraints.
+You must obey it strictly.
 
 BLUEPRINT:
 ${blueprint.content}
@@ -633,26 +831,32 @@ ${snapshot.fileList}
 IMPORTANT FILE EXCERPTS:
 ${snapshot.fileContexts}
 
-RECENT ACCEPTED TASKS:
+KNOWN DEPENDENCIES:
+${JSON.stringify(snapshot.dependencySummary.slice(0, 120), null, 2)}
+
+LEARNED SUCCESSES:
 ${JSON.stringify(memory.accepted.slice(0, 10), null, 2)}
 
-RECENT FAILED TASKS:
+LEARNED FAILURES:
 ${JSON.stringify(memory.failed.slice(0, 10), null, 2)}
 
-Your job:
-1. Understand the blueprint
-2. Generate a prioritized backlog of safe and realistic improvements
-3. Focus on categories:
-   - security
-   - performance
-   - product
-   - bugfix
-   - refactor
-   - dx
-   - tests
-4. NEVER invent files that do not exist unless a new file is clearly justified
-5. Only propose small, incremental, shippable tasks
-6. Max ${CONFIG.MAX_FILES_PER_TASK} files per task
+PREVIOUS SUCCESSFUL TASK SIGNATURES:
+${JSON.stringify(memory.learned.successfulTaskSignatures.slice(0, 20), null, 2)}
+
+PREVIOUS FAILED TASK SIGNATURES:
+${JSON.stringify(memory.learned.failedTaskSignatures.slice(0, 20), null, 2)}
+
+CRITICAL RULES:
+- Use BLUEPRINT as source of truth
+- Propose ONLY improvements aligned with the existing system
+- DO NOT introduce new frameworks or platforms unless already present in dependencies or files
+- DO NOT introduce: ${CONFIG.FORBIDDEN_TECH_KEYWORDS.join(", ")}
+- NEVER suggest protected/internal files
+- Prefer improving existing modules, bugfixes, tests, validation, security hardening, performance, DX
+- Do not suggest generic auth rewrites unless clearly supported by existing codebase
+- If a technology is not clearly present, do not propose it
+- Only propose small, shippable, low-risk tasks
+- Max ${CONFIG.MAX_FILES_PER_TASK} files per task
 
 Return ONLY valid JSON in this exact shape:
 {
@@ -674,7 +878,7 @@ Return ONLY valid JSON in this exact shape:
 `.trim();
 }
 
-function buildExecutorPrompt({ blueprint, task, fileContexts, commands }) {
+function buildExecutorPrompt({ blueprint, task, fileContexts, commands, memory }) {
     return `
 You are implementing one task in a production codebase.
 
@@ -690,17 +894,30 @@ ${JSON.stringify(commands, null, 2)}
 CURRENT FILES:
 ${fileContexts}
 
-Instructions:
+LEARNED FAILURES:
+${JSON.stringify(memory.failed.slice(0, 8), null, 2)}
+
+CRITICAL IMPLEMENTATION RULES:
 - Implement ONLY this task
+- Respect the blueprint and current stack
 - Keep scope small and safe
-- Respect the blueprint
 - Do not modify unrelated files
 - Use exact relative repo paths
 - Existing files must be fully rewritten in output
-- New files are allowed only if justified by the task
-- Prefer robust production-ready code
-- If useful, include tests
-- Never include markdown fences
+- New files only if task justifies it
+- Output MUST be valid JSON
+- Do not use markdown fences
+- Do not use JavaScript template strings around file content
+- File content must be a normal JSON string
+- NEVER modify or access these files:
+  - agent3.cjs
+  - agent4.cjs
+  - agent5.cjs
+  - .agent-memory.json
+  - .agent-lock
+  - BLUEPRINT.md
+- Never introduce these technologies unless already present in the codebase:
+  - ${CONFIG.FORBIDDEN_TECH_KEYWORDS.join("\n  - ")}
 
 Return ONLY valid JSON in this exact shape:
 {
@@ -732,7 +949,7 @@ IMPLEMENTATION:
 ${JSON.stringify(implementation, null, 2)}
 
 DIFF:
-${truncate(diff, 40000)}
+${truncate(diff, 45000)}
 
 Approve only if:
 - it matches the blueprint
@@ -743,6 +960,8 @@ Approve only if:
 - no obvious breakage
 - no secrets or destructive operations
 - no unrelated changes
+- no protected files are touched
+- no new frameworks outside current stack
 
 Return ONLY valid JSON:
 {
@@ -754,9 +973,58 @@ Return ONLY valid JSON:
 `.trim();
 }
 
+function buildSelfHealPrompt({ blueprint, task, implementation, failedSummary, currentFiles }) {
+    return `
+You are a senior engineer fixing a failed implementation after lint/build/test failure.
+
+SOURCE OF TRUTH:
+${blueprint.content}
+
+TASK:
+${JSON.stringify(task, null, 2)}
+
+FAILED IMPLEMENTATION SUMMARY:
+${JSON.stringify(implementation, null, 2)}
+
+FAILURE OUTPUT:
+${failedSummary}
+
+CURRENT FILES:
+${currentFiles}
+
+RULES:
+- Fix only the failure
+- Keep same task scope
+- Preserve the original intent
+- Do not touch unrelated files
+- Output valid JSON only
+- Do not use template strings around content
+- Do not touch protected files
+
+Return ONLY:
+{
+  "summary": "what was fixed",
+  "files": [
+    {
+      "path": "relative/path.ext",
+      "action": "update|create",
+      "content": "full file content"
+    }
+  ],
+  "delete_files": [],
+  "notes": ["..."]
+}
+`.trim();
+}
+
 /* ========================= TASK / PLAN VALIDATION ========================= */
 
-function validateBacklog(backlog, repoIndex) {
+function detectForbiddenKeywordsInTask(task) {
+    const serialized = JSON.stringify(task).toLowerCase();
+    return CONFIG.FORBIDDEN_TECH_KEYWORDS.filter((kw) => serialized.includes(kw));
+}
+
+function validateBacklog(backlog, repoIndex, memory) {
     if (!backlog || typeof backlog !== "object") {
         throw new Error("Backlog inválido.");
     }
@@ -772,14 +1040,20 @@ function validateBacklog(backlog, repoIndex) {
         if (!task || typeof task !== "object") continue;
         if (!task.id || !task.title || !task.category || !task.goal) continue;
 
-        const files = Array.isArray(task.files) ? task.files.filter(Boolean) : [];
-        const validFiles = files.filter((f) => realFiles.has(normalizeSlashes(f)));
-
-        if (files.length > 0 && validFiles.length === 0 && !task.new_files_allowed) {
+        const forbidden = detectForbiddenKeywordsInTask(task);
+        if (forbidden.length) {
+            memory.learned.forbiddenKeywordsObserved.push(...forbidden);
+            memory.learned.forbiddenKeywordsObserved = unique(memory.learned.forbiddenKeywordsObserved).slice(0, 100);
             continue;
         }
 
-        cleaned.push({
+        const files = Array.isArray(task.files) ? task.files.filter(Boolean) : [];
+        const validFiles = files
+            .map(normalizeSlashes)
+            .filter((f) => !isProtectedFile(f))
+            .filter((f) => realFiles.has(f));
+
+        const normalizedTask = {
             id: String(task.id),
             title: String(task.title),
             category: String(task.category),
@@ -789,53 +1063,18 @@ function validateBacklog(backlog, repoIndex) {
             files: validFiles.slice(0, CONFIG.MAX_FILES_PER_TASK),
             new_files_allowed: Boolean(task.new_files_allowed),
             commit_message: String(task.commit_message || `chore: ${task.title}`)
-        });
+        };
+
+        if (!normalizedTask.files.length && !normalizedTask.new_files_allowed) {
+            continue;
+        }
+
+        cleaned.push(normalizedTask);
     }
 
     backlog.tasks = cleaned;
     return backlog;
 }
-
-function scoreTask(task) {
-    const categoryScore = {
-        security: 100,
-        bugfix: 90,
-        performance: 80,
-        tests: 70,
-        product: 65,
-        refactor: 55,
-        dx: 50
-    };
-
-    const priorityScore = {
-        high: 30,
-        medium: 20,
-        low: 10
-    };
-
-    return (categoryScore[task.category] || 0) + (priorityScore[task.priority] || 0);
-}
-
-function pickNextTask(memory) {
-    const backlog = Array.isArray(memory.backlog) ? memory.backlog : [];
-    if (backlog.length === 0) return null;
-
-    const failedGoals = new Set(
-        memory.failed.slice(0, 20).map((item) => String(item?.goal || item?.title || ""))
-    );
-
-    const sorted = [...backlog]
-        .filter((task) => !failedGoals.has(task.goal))
-        .sort((a, b) => scoreTask(b) - scoreTask(a));
-
-    return sorted[0] || backlog[0] || null;
-}
-
-function removeTaskFromBacklog(memory, taskId) {
-    memory.backlog = (memory.backlog || []).filter((t) => t.id !== taskId);
-}
-
-/* ========================= FILE APPLICATION ========================= */
 
 function validateImplementation(impl, task) {
     if (!impl || typeof impl !== "object") {
@@ -875,8 +1114,18 @@ function validateImplementation(impl, task) {
             throw new Error(`Extensão não permitida: ${f.path}`);
         }
 
+        if (isProtectedFile(f.path)) {
+            throw new Error(`Tentativa de alterar arquivo protegido: ${f.path}`);
+        }
+
         if (f.action === "create" && !CONFIG.ALLOW_NEW_FILES && !task.new_files_allowed) {
             throw new Error(`Criação de arquivo não permitida: ${f.path}`);
+        }
+    }
+
+    for (const d of impl.delete_files || []) {
+        if (isProtectedFile(d)) {
+            throw new Error(`Tentativa de deletar arquivo protegido: ${d}`);
         }
     }
 
@@ -886,6 +1135,58 @@ function validateImplementation(impl, task) {
 
     return impl;
 }
+
+function scoreTask(task) {
+    const categoryScore = {
+        security: 100,
+        bugfix: 95,
+        performance: 85,
+        tests: 75,
+        product: 65,
+        refactor: 55,
+        dx: 50
+    };
+
+    const priorityScore = {
+        high: 30,
+        medium: 20,
+        low: 10
+    };
+
+    return (categoryScore[task.category] || 0) + (priorityScore[task.priority] || 0);
+}
+
+function countTaskFailures(memory, task) {
+    const signature = stableTaskSignature(task);
+    return memory.failed.filter((f) => f?.signature === signature).length;
+}
+
+function wasTaskSuccessful(memory, task) {
+    const signature = stableTaskSignature(task);
+    return memory.learned.successfulTaskSignatures.includes(signature);
+}
+
+function wasTaskFailedTooMuch(memory, task) {
+    return countTaskFailures(memory, task) >= CONFIG.MAX_REPEAT_FAILURES_PER_TASK;
+}
+
+function pickNextTask(memory) {
+    const backlog = Array.isArray(memory.backlog) ? memory.backlog : [];
+    if (!backlog.length) return null;
+
+    const candidates = backlog
+        .filter((task) => !wasTaskSuccessful(memory, task))
+        .filter((task) => !wasTaskFailedTooMuch(memory, task))
+        .sort((a, b) => scoreTask(b) - scoreTask(a));
+
+    return candidates[0] || null;
+}
+
+function removeTaskFromBacklog(memory, taskId) {
+    memory.backlog = (memory.backlog || []).filter((t) => t.id !== taskId);
+}
+
+/* ========================= FILE APPLICATION ========================= */
 
 function backupFiles(paths) {
     const map = new Map();
@@ -916,10 +1217,8 @@ function applyImplementation(impl) {
     for (const file of impl.files) {
         const full = abs(file.path);
 
-        if (file.action === "create") {
-            if (!CONFIG.ALLOW_NEW_FILES && !exists(full)) {
-                throw new Error(`Criação de arquivo bloqueada: ${file.path}`);
-            }
+        if (isProtectedFile(file.path)) {
+            throw new Error(`Arquivo protegido bloqueado: ${file.path}`);
         }
 
         safeWrite(full, file.content);
@@ -927,6 +1226,10 @@ function applyImplementation(impl) {
     }
 
     for (const delPath of impl.delete_files || []) {
+        if (isProtectedFile(delPath)) {
+            throw new Error(`Arquivo protegido bloqueado para delete: ${delPath}`);
+        }
+
         const full = abs(delPath);
         if (exists(full)) {
             fs.unlinkSync(full);
@@ -990,10 +1293,10 @@ async function generateBacklog(memory, blueprint, repoIndex) {
         throw new Error(`Falha ao parsear backlog do planner.\nRAW:\n${raw}`);
     }
 
-    return validateBacklog(parsed, repoIndex);
+    return validateBacklog(parsed, repoIndex, memory);
 }
 
-async function generateImplementation(task, blueprint) {
+async function generateImplementation(task, blueprint, memory) {
     const fileContexts = collectContextsForTask(task);
     const commands = detectProjectCommands();
 
@@ -1001,7 +1304,8 @@ async function generateImplementation(task, blueprint) {
         blueprint,
         task,
         fileContexts,
-        commands
+        commands,
+        memory
     });
 
     const raw = await askModel(CONFIG.MODEL_EXECUTOR, prompt);
@@ -1062,6 +1366,67 @@ function runVerification(memory) {
     };
 }
 
+async function trySelfHeal({ blueprint, task, implementation, checks, memory }) {
+    const failedSummary = [
+        summarizeCommandFailures(checks.verifyResults),
+        summarizeCommandFailures(checks.testResults)
+    ].filter(Boolean).join("\n\n");
+
+    let currentImpl = implementation;
+
+    for (let attempt = 1; attempt <= CONFIG.MAX_SELF_HEAL_ATTEMPTS; attempt++) {
+        log(`🩹 self-heal attempt ${attempt}/${CONFIG.MAX_SELF_HEAL_ATTEMPTS}`);
+
+        const currentFiles = collectContextsForTask(task);
+        const prompt = buildSelfHealPrompt({
+            blueprint,
+            task,
+            implementation: currentImpl,
+            failedSummary,
+            currentFiles
+        });
+
+        const raw = await askModel(CONFIG.MODEL_FIXER, prompt);
+        const fixedImpl = parseJsonLoose(raw);
+
+        if (!fixedImpl) {
+            continue;
+        }
+
+        validateImplementation(fixedImpl, task);
+
+        if (containsDangerousContent(fixedImpl)) {
+            continue;
+        }
+
+        const touchedPaths = unique([
+            ...fixedImpl.files.map((f) => normalizeSlashes(f.path)),
+            ...(fixedImpl.delete_files || []).map((p) => normalizeSlashes(p))
+        ]);
+
+        const backups = backupFiles(touchedPaths);
+
+        try {
+            applyImplementation(fixedImpl);
+            const newChecks = runVerification(memory);
+
+            if (newChecks.ok) {
+                memory.metrics.selfHealSuccess++;
+                return { ok: true, implementation: fixedImpl };
+            }
+
+            restoreBackup(backups);
+            rollbackHard();
+        } catch {
+            restoreBackup(backups);
+            rollbackHard();
+        }
+    }
+
+    memory.metrics.selfHealFail++;
+    return { ok: false };
+}
+
 /* ========================= MAIN LOOP ========================= */
 
 async function main() {
@@ -1109,8 +1474,38 @@ async function main() {
                 const task = pickNextTask(memory);
 
                 if (!task) {
-                    log("⏸️ no task available, regenerating backlog on next loop");
+                    log("⏸️ no valid task available, regenerating backlog on next loop");
                     memory.backlog = [];
+                    saveMemory(memory);
+                    await sleep(CONFIG.LOOP_DELAY_MS);
+                    continue;
+                }
+
+                if (wasTaskSuccessful(memory, task)) {
+                    log("⚠️ skipping already successful task:", task.title);
+                    memory.skipped.unshift({
+                        at: new Date().toISOString(),
+                        id: task.id,
+                        title: task.title,
+                        reason: "already completed",
+                        signature: stableTaskSignature(task)
+                    });
+                    removeTaskFromBacklog(memory, task.id);
+                    saveMemory(memory);
+                    await sleep(CONFIG.LOOP_DELAY_MS);
+                    continue;
+                }
+
+                if (wasTaskFailedTooMuch(memory, task)) {
+                    log("⚠️ skipping repeated failure:", task.title);
+                    memory.skipped.unshift({
+                        at: new Date().toISOString(),
+                        id: task.id,
+                        title: task.title,
+                        reason: "repeated failure limit reached",
+                        signature: stableTaskSignature(task)
+                    });
+                    removeTaskFromBacklog(memory, task.id);
                     saveMemory(memory);
                     await sleep(CONFIG.LOOP_DELAY_MS);
                     continue;
@@ -1122,7 +1517,7 @@ async function main() {
                 memory.metrics.tasksExecuted++;
                 saveMemory(memory);
 
-                const implementation = await generateImplementation(task, blueprint);
+                const implementation = await generateImplementation(task, blueprint, memory);
 
                 const touchedPaths = unique([
                     ...implementation.files.map((f) => normalizeSlashes(f.path)),
@@ -1148,24 +1543,28 @@ async function main() {
                     restoreBackup(backups);
                     rollbackHard();
 
+                    const reason = review.reason || "review rejected";
                     memory.failed.unshift({
                         at: new Date().toISOString(),
                         id: task.id,
                         title: task.title,
                         goal: task.goal,
-                        reason: review.reason || "review rejected"
+                        reason,
+                        signature: stableTaskSignature(task)
                     });
+
+                    rememberFailure(memory, task, reason);
 
                     removeTaskFromBacklog(memory, task.id);
                     pushHistory(memory, {
                         type: "task_rejected",
                         id: task.id,
                         title: task.title,
-                        reason: review.reason || "review rejected"
+                        reason
                     });
 
                     saveMemory(memory);
-                    log("❌ rejected:", review.reason || "sem motivo");
+                    log("❌ rejected:", reason);
                     await sleep(CONFIG.LOOP_DELAY_MS);
                     continue;
                 }
@@ -1173,21 +1572,39 @@ async function main() {
                 memory.metrics.approvals++;
                 saveMemory(memory);
 
-                const checks = runVerification(memory);
+                let checks = runVerification(memory);
+
+                if (!checks.ok) {
+                    const healed = await trySelfHeal({
+                        blueprint,
+                        task,
+                        implementation,
+                        checks,
+                        memory
+                    });
+
+                    if (healed.ok) {
+                        log("🩹 self-heal fixed verify/test failure");
+                        checks = { ok: true, verifyResults: [], testResults: [] };
+                    }
+                }
 
                 if (!checks.ok) {
                     restoreBackup(backups);
                     rollbackHard();
+
+                    const failureReason = `verify/test failed\n${summarizeCommandFailures(checks.verifyResults)}\n${summarizeCommandFailures(checks.testResults)}`.trim();
 
                     memory.failed.unshift({
                         at: new Date().toISOString(),
                         id: task.id,
                         title: task.title,
                         goal: task.goal,
-                        reason: "verify/test failed",
-                        verifyResults: checks.verifyResults,
-                        testResults: checks.testResults
+                        reason: failureReason,
+                        signature: stableTaskSignature(task)
                     });
+
+                    rememberFailure(memory, task, failureReason);
 
                     removeTaskFromBacklog(memory, task.id);
                     pushHistory(memory, {
@@ -1229,8 +1646,11 @@ async function main() {
                     category: task.category,
                     priority: task.priority,
                     goal: task.goal,
-                    commit_message: commitMessage
+                    commit_message: commitMessage,
+                    signature: stableTaskSignature(task)
                 });
+
+                rememberSuccess(memory, task, commitMessage);
 
                 removeTaskFromBacklog(memory, task.id);
                 memory.metrics.lastSuccessAt = new Date().toISOString();
@@ -1250,7 +1670,8 @@ async function main() {
 
                 memory.failed.unshift({
                     at: new Date().toISOString(),
-                    reason: err.message || String(err)
+                    reason: err.message || String(err),
+                    signature: stableTextSignature(err.message || String(err))
                 });
 
                 pushHistory(memory, {
