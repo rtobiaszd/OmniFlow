@@ -7,15 +7,13 @@ const crypto = require("crypto");
 const axios = require("axios");
 const { spawnSync } = require("child_process");
 
-/* =========================================================
- * AGENT LEVEL 7 - BLUEPRINT DRIVEN AUTONOMOUS ENGINEER
- * ========================================================= */
-
 const CONFIG = {
     REPO_PATH: process.env.REPO_PATH || process.cwd(),
     BLUEPRINT_FILE: process.env.BLUEPRINT_FILE || "BLUEPRINT.md",
-    MAIN_EVOLUTION_DOC: process.env.MAIN_EVOLUTION_DOC || process.env.BLUEPRINT_FILE || "BLUEPRINT.md",
-    EVOLUTION_SECTION_TITLE: process.env.EVOLUTION_SECTION_TITLE || "## Auto Evolution Log",
+    MAIN_EVOLUTION_DOC:
+        process.env.MAIN_EVOLUTION_DOC || process.env.BLUEPRINT_FILE || "BLUEPRINT.md",
+    EVOLUTION_SECTION_TITLE:
+        process.env.EVOLUTION_SECTION_TITLE || "## Auto Evolution Log",
     MAX_EVOLUTION_ENTRIES: Number(process.env.MAX_EVOLUTION_ENTRIES || 200),
 
     OLLAMA_URL: process.env.OLLAMA_URL || "http://localhost:11434/api/generate",
@@ -23,7 +21,8 @@ const CONFIG = {
     MODEL_EXECUTOR: process.env.MODEL_EXECUTOR || "qwen2.5-coder:7b",
     MODEL_REVIEWER: process.env.MODEL_REVIEWER || "qwen2.5-coder:7b",
     MODEL_FIXER: process.env.MODEL_FIXER || "qwen2.5-coder:7b",
-    MODEL_JSON_REPAIR: process.env.MODEL_JSON_REPAIR || process.env.MODEL_FIXER || "qwen2.5-coder:7b",
+    MODEL_JSON_REPAIR:
+        process.env.MODEL_JSON_REPAIR || process.env.MODEL_FIXER || "qwen2.5-coder:7b",
 
     REMOTE_NAME: process.env.REMOTE_NAME || "origin",
     AUTO_PUSH: String(process.env.AUTO_PUSH || "true").toLowerCase() === "true",
@@ -40,19 +39,22 @@ const CONFIG = {
     MAX_BACKLOG_ITEMS: Number(process.env.MAX_BACKLOG_ITEMS || 20),
     MAX_HISTORY_ITEMS: Number(process.env.MAX_HISTORY_ITEMS || 500),
 
-    MAX_REPEAT_FAILURES_PER_TASK: Number(process.env.MAX_REPEAT_FAILURES_PER_TASK || 8),
-    MAX_REPLAN_PER_TASK: Number(process.env.MAX_REPLAN_PER_TASK || 3),
+    MAX_REPEAT_FAILURES_PER_TASK: Number(process.env.MAX_REPEAT_FAILURES_PER_TASK || 4),
+    MAX_REPLAN_PER_TASK: Number(process.env.MAX_REPLAN_PER_TASK || 2),
     MAX_HOT_FILES: Number(process.env.MAX_HOT_FILES || 20),
     HOT_FILE_FAILURE_THRESHOLD: Number(process.env.HOT_FILE_FAILURE_THRESHOLD || 3),
     EVOLUTION_DOC_CONTEXT_CHARS: Number(process.env.EVOLUTION_DOC_CONTEXT_CHARS || 18000),
-    MAX_SELF_HEAL_ATTEMPTS: Number(process.env.MAX_SELF_HEAL_ATTEMPTS || 10),
+    MAX_SELF_HEAL_ATTEMPTS: Number(process.env.MAX_SELF_HEAL_ATTEMPTS || 6),
     MAX_PARSE_RETRIES: Number(process.env.MAX_PARSE_RETRIES || 4),
     MAX_JSON_REPAIR_ATTEMPTS: Number(process.env.MAX_JSON_REPAIR_ATTEMPTS || 2),
+    MAX_IDENTICAL_ERROR_RETRIES: Number(process.env.MAX_IDENTICAL_ERROR_RETRIES || 2),
 
     ALLOW_NEW_FILES: String(process.env.ALLOW_NEW_FILES || "true").toLowerCase() === "true",
     ALLOW_DELETE_FILES: String(process.env.ALLOW_DELETE_FILES || "false").toLowerCase() === "true",
     STRICT_CLEAN_START: String(process.env.STRICT_CLEAN_START || "true").toLowerCase() === "true",
-    IGNORE_UNTRACKED_PROTECTED_FILES_ONLY: String(process.env.IGNORE_UNTRACKED_PROTECTED_FILES_ONLY || "true").toLowerCase() === "true",
+    IGNORE_UNTRACKED_PROTECTED_FILES_ONLY:
+        String(process.env.IGNORE_UNTRACKED_PROTECTED_FILES_ONLY || "true").toLowerCase() ===
+        "true",
     DEBUG: String(process.env.DEBUG || "false").toLowerCase() === "true",
 
     IGNORE_DIRS: [
@@ -69,7 +71,7 @@ const CONFIG = {
         "vendor",
         "storage",
         "tmp",
-        "temp"
+        "temp",
     ],
 
     IGNORE_FILES: [
@@ -81,7 +83,8 @@ const CONFIG = {
         "agent4.cjs",
         "agent5.cjs",
         "agent6.cjs",
-        "agent7.cjs"
+        "agent7.cjs",
+        "agent7-stable.cjs",
     ],
 
     PROTECTED_FILES: [
@@ -94,13 +97,48 @@ const CONFIG = {
         "agent5.cjs",
         "agent6.cjs",
         "agent7.cjs",
-        "BLUEPRINT.md"
+        "agent7-stable.cjs",
+        "BLUEPRINT.md",
+    ],
+
+    BLOCKED_FILE_NAMES: [
+        ".env",
+        ".env.example",
+        ".env.local",
+        ".env.development",
+        ".env.test",
+        ".env.production",
+        ".npmrc",
+        ".yarnrc",
+        ".pnpmrc",
+    ],
+
+    SPECIAL_ALLOWED_FILES: [
+        ".gitignore",
+        ".eslintrc",
+        ".eslintrc.js",
+        ".eslintrc.cjs",
+        ".prettierrc",
+        ".prettierrc.js",
+        ".prettierrc.cjs",
     ],
 
     ALLOWED_EXTENSIONS: [
-        ".js", ".cjs", ".mjs", ".ts", ".tsx", ".jsx",
-        ".json", ".md", ".yml", ".yaml", ".sql",
-        ".css", ".scss", ".prisma", ".html"
+        ".js",
+        ".cjs",
+        ".mjs",
+        ".ts",
+        ".tsx",
+        ".jsx",
+        ".json",
+        ".md",
+        ".yml",
+        ".yaml",
+        ".sql",
+        ".css",
+        ".scss",
+        ".prisma",
+        ".html",
     ],
 
     FORBIDDEN_TECH_KEYWORDS: [
@@ -116,11 +154,9 @@ const CONFIG = {
         "rails",
         "laravel",
         "supabase",
-        "graphql"
-    ]
+        "graphql",
+    ],
 };
-
-/* ========================= BASIC UTILS ========================= */
 
 function log(...args) {
     console.log(new Date().toISOString(), "-", ...args);
@@ -162,7 +198,7 @@ function safeWrite(p, content) {
 }
 
 function normalizeSlashes(p) {
-    return String(p).replace(/\\/g, "/");
+    return String(p || "").replace(/\\/g, "/");
 }
 
 function rel(absPath) {
@@ -186,12 +222,11 @@ function truncate(text, max) {
 }
 
 function unique(arr) {
-    return [...new Set(arr)];
+    return [...new Set(arr.filter(Boolean))];
 }
 
 function stripCodeFence(text) {
-    if (!text) return "";
-    return text
+    return String(text || "")
         .replace(/^```(?:json|javascript|js|txt)?\s*/i, "")
         .replace(/\s*```$/i, "")
         .trim();
@@ -218,16 +253,54 @@ function isIgnoredFile(name) {
     return CONFIG.IGNORE_FILES.includes(name);
 }
 
-function hasAllowedExtension(file) {
-    const lower = String(file).toLowerCase();
+function basenameNormalized(filePath) {
+    return path.basename(normalizeSlashes(filePath)).toLowerCase();
+}
+
+function isBlockedFileName(filePath) {
+    const base = basenameNormalized(filePath);
+    return CONFIG.BLOCKED_FILE_NAMES.includes(base);
+}
+
+function isSpecialAllowedFile(filePath) {
+    const base = basenameNormalized(filePath);
+    return CONFIG.SPECIAL_ALLOWED_FILES.includes(base);
+}
+
+function hasAllowedExtension(filePath) {
+    const lower = normalizeSlashes(filePath).toLowerCase();
+    if (isSpecialAllowedFile(lower)) return true;
     return CONFIG.ALLOWED_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}
+
+function classifyFileEligibility(filePath) {
+    const normalized = normalizeSlashes(filePath);
+    const base = basenameNormalized(normalized);
+
+    if (!normalized) {
+        return { allowed: false, reason: "empty_path", fatal: false };
+    }
+
+    if (isProtectedFile(normalized)) {
+        return { allowed: false, reason: `protected:${base}`, fatal: true };
+    }
+
+    if (isBlockedFileName(normalized)) {
+        return { allowed: false, reason: `blocked_name:${base}`, fatal: false };
+    }
+
+    if (!hasAllowedExtension(normalized)) {
+        return { allowed: false, reason: `blocked_extension:${base}`, fatal: false };
+    }
+
+    return { allowed: true, reason: "allowed", fatal: false };
 }
 
 function fileLooksText(p) {
     try {
         const buf = fs.readFileSync(p);
         const len = Math.min(buf.length, 512);
-        for (let i = 0; i < len; i++) {
+        for (let i = 0; i < len; i += 1) {
             if (buf[i] === 0) return false;
         }
         return true;
@@ -238,7 +311,7 @@ function fileLooksText(p) {
 
 function isProtectedFile(filePath) {
     const normalized = normalizeSlashes(filePath).toLowerCase();
-    return CONFIG.PROTECTED_FILES.some((p) => normalized.endsWith(p.toLowerCase()));
+    return CONFIG.PROTECTED_FILES.some((p) => normalized.endsWith(String(p).toLowerCase()));
 }
 
 function nowDate() {
@@ -254,27 +327,14 @@ function stableTaskSignature(task) {
         title: String(task?.title || ""),
         category: String(task?.category || ""),
         goal: String(task?.goal || ""),
-        files: Array.isArray(task?.files) ? [...task.files].sort() : []
+        files: Array.isArray(task?.files) ? [...task.files].sort() : [],
     };
-
     return sha1(JSON.stringify(payload));
 }
 
 function stableTextSignature(text) {
     return sha1(String(text || "").trim().toLowerCase());
 }
-
-function tooManyGlobalFailures(memory, err) {
-    const sig = stableTextSignature(err.message || String(err));
-
-    const count = (memory.failed || []).filter(
-        (f) => f.signature === sig || f.error_signature === sig
-    ).length;
-
-    return count >= 5;
-}
-
-/* ========================= JSON / REPAIR ========================= */
 
 function sanitizeModelOutput(raw) {
     if (!raw) return "";
@@ -301,41 +361,32 @@ function parseJsonSafe(raw) {
         if (!match) return null;
 
         let candidate = match[0];
-
         candidate = candidate.replace(/,\s*([}\]])/g, "$1");
-
         candidate = candidate.replace(/:\s*`([\s\S]*?)`(?=\s*[,}])/g, (_, c) => {
             return ": " + JSON.stringify(c);
         });
 
         try {
             return JSON.parse(candidate);
-        } catch { }
-
-        return null;
+        } catch {
+            return null;
+        }
     } catch {
         return null;
     }
 }
 
+async function askModel(model, prompt) {
+    const response = await axios.post(
+        CONFIG.OLLAMA_URL,
+        { model, prompt, stream: false },
+        { timeout: 1000 * 60 * 10 }
+    );
+    return response.data.response || "";
+}
+
 async function repairJsonWithModel(model, raw, label) {
-    const prompt = `
-You are a JSON repair engine.
-
-TASK:
-Repair the following broken JSON so it becomes directly parsable by JSON.parse.
-
-RULES:
-- Return ONLY valid JSON
-- No markdown
-- No explanation
-- Keep the original structure and intent
-- Escape all strings correctly
-- Preserve file contents exactly as much as possible
-
-BROKEN INPUT:
-${truncate(raw, 40000)}
-`.trim();
+    const prompt = `You are a JSON repair engine.\n\nTASK:\nRepair the following broken JSON so it becomes directly parsable by JSON.parse.\n\nRULES:\n- Return ONLY valid JSON\n- No markdown\n- No explanation\n- Keep the original structure and intent\n- Escape all strings correctly\n- Preserve file contents exactly as much as possible\n\nBROKEN INPUT:\n${truncate(raw, 40000)}`;
 
     const repairedRaw = await askModel(model, prompt);
     const parsed = parseJsonSafe(repairedRaw);
@@ -357,20 +408,13 @@ function isValidImplementation(impl) {
         impl &&
         typeof impl === "object" &&
         Array.isArray(impl.files) &&
-        impl.files.length > 0 &&
         impl.files.every((f) => f && typeof f.path === "string" && typeof f.content === "string")
     );
 }
 
 function isValidReview(review) {
-    return Boolean(
-        review &&
-        typeof review === "object" &&
-        typeof review.verdict === "string"
-    );
+    return Boolean(review && typeof review === "object" && typeof review.verdict === "string");
 }
-
-/* ========================= LOCK ========================= */
 
 function lockFile() {
     return path.join(CONFIG.REPO_PATH, ".agent-lock");
@@ -389,8 +433,6 @@ function releaseLock() {
     } catch { }
 }
 
-/* ========================= MEMORY ========================= */
-
 function memoryFile() {
     return path.join(CONFIG.REPO_PATH, ".agent-memory.json");
 }
@@ -404,6 +446,7 @@ function createMemory() {
         failed: [],
         skipped: [],
         history: [],
+        identicalFailureBursts: {},
         learned: {
             successfulTaskSignatures: [],
             failedTaskSignatures: [],
@@ -414,7 +457,7 @@ function createMemory() {
             testPatterns: [],
             fileFailureStats: {},
             taskReplanStats: {},
-            nextOpportunityPatterns: []
+            nextOpportunityPatterns: [],
         },
         metrics: {
             iterations: 0,
@@ -434,8 +477,8 @@ function createMemory() {
             replans: 0,
             blueprintUpdates: 0,
             lastSuccessAt: null,
-            lastErrorAt: null
-        }
+            lastErrorAt: null,
+        },
     };
 }
 
@@ -451,46 +494,49 @@ function sanitizeMemory(raw) {
         failed: Array.isArray(m.failed) ? m.failed : [],
         skipped: Array.isArray(m.skipped) ? m.skipped : [],
         history: Array.isArray(m.history) ? m.history : [],
+        identicalFailureBursts:
+            m.identicalFailureBursts && typeof m.identicalFailureBursts === "object"
+                ? m.identicalFailureBursts
+                : {},
         learned: {
             ...base.learned,
             ...(m.learned || {}),
-            successfulTaskSignatures: Array.isArray(m?.learned?.successfulTaskSignatures) ? m.learned.successfulTaskSignatures : [],
-            failedTaskSignatures: Array.isArray(m?.learned?.failedTaskSignatures) ? m.learned.failedTaskSignatures : [],
-            successfulCommitMessages: Array.isArray(m?.learned?.successfulCommitMessages) ? m.learned.successfulCommitMessages : [],
-            forbiddenKeywordsObserved: Array.isArray(m?.learned?.forbiddenKeywordsObserved) ? m.learned.forbiddenKeywordsObserved : [],
+            successfulTaskSignatures: Array.isArray(m?.learned?.successfulTaskSignatures)
+                ? m.learned.successfulTaskSignatures
+                : [],
+            failedTaskSignatures: Array.isArray(m?.learned?.failedTaskSignatures)
+                ? m.learned.failedTaskSignatures
+                : [],
+            successfulCommitMessages: Array.isArray(m?.learned?.successfulCommitMessages)
+                ? m.learned.successfulCommitMessages
+                : [],
+            forbiddenKeywordsObserved: Array.isArray(m?.learned?.forbiddenKeywordsObserved)
+                ? m.learned.forbiddenKeywordsObserved
+                : [],
             lintPatterns: Array.isArray(m?.learned?.lintPatterns) ? m.learned.lintPatterns : [],
             buildPatterns: Array.isArray(m?.learned?.buildPatterns) ? m.learned.buildPatterns : [],
             testPatterns: Array.isArray(m?.learned?.testPatterns) ? m.learned.testPatterns : [],
-            fileFailureStats: m?.learned?.fileFailureStats && typeof m.learned.fileFailureStats === "object" ? m.learned.fileFailureStats : {},
-            taskReplanStats: m?.learned?.taskReplanStats && typeof m.learned.taskReplanStats === "object" ? m.learned.taskReplanStats : {},
-            nextOpportunityPatterns: Array.isArray(m?.learned?.nextOpportunityPatterns) ? m.learned.nextOpportunityPatterns : []
+            fileFailureStats:
+                m?.learned?.fileFailureStats && typeof m.learned.fileFailureStats === "object"
+                    ? m.learned.fileFailureStats
+                    : {},
+            taskReplanStats:
+                m?.learned?.taskReplanStats && typeof m.learned.taskReplanStats === "object"
+                    ? m.learned.taskReplanStats
+                    : {},
+            nextOpportunityPatterns: Array.isArray(m?.learned?.nextOpportunityPatterns)
+                ? m.learned.nextOpportunityPatterns
+                : [],
         },
         metrics: {
             ...base.metrics,
             ...(m.metrics || {}),
-            iterations: Number(m?.metrics?.iterations || 0),
-            plannerRuns: Number(m?.metrics?.plannerRuns || 0),
-            tasksExecuted: Number(m?.metrics?.tasksExecuted || 0),
-            approvals: Number(m?.metrics?.approvals || 0),
-            rejections: Number(m?.metrics?.rejections || 0),
-            applied: Number(m?.metrics?.applied || 0),
-            commits: Number(m?.metrics?.commits || 0),
-            pushes: Number(m?.metrics?.pushes || 0),
-            verifyPass: Number(m?.metrics?.verifyPass || 0),
-            verifyFail: Number(m?.metrics?.verifyFail || 0),
-            testPass: Number(m?.metrics?.testPass || 0),
-            testFail: Number(m?.metrics?.testFail || 0),
-            selfHealSuccess: Number(m?.metrics?.selfHealSuccess || 0),
-            selfHealFail: Number(m?.metrics?.selfHealFail || 0),
-            replans: Number(m?.metrics?.replans || 0),
-            blueprintUpdates: Number(m?.metrics?.blueprintUpdates || 0)
-        }
+        },
     };
 }
 
 function loadMemory() {
     if (!exists(memoryFile())) return createMemory();
-
     try {
         const raw = JSON.parse(safeRead(memoryFile(), "{}"));
         return sanitizeMemory(raw);
@@ -504,11 +550,7 @@ function saveMemory(memory) {
 }
 
 function pushHistory(memory, item) {
-    memory.history.unshift({
-        at: new Date().toISOString(),
-        ...item
-    });
-
+    memory.history.unshift({ at: new Date().toISOString(), ...item });
     if (memory.history.length > CONFIG.MAX_HISTORY_ITEMS) {
         memory.history = memory.history.slice(0, CONFIG.MAX_HISTORY_ITEMS);
     }
@@ -516,7 +558,6 @@ function pushHistory(memory, item) {
 
 function rememberSuccess(memory, task, commitMessage) {
     const signature = stableTaskSignature(task);
-
     if (!memory.learned.successfulTaskSignatures.includes(signature)) {
         memory.learned.successfulTaskSignatures.unshift(signature);
     }
@@ -526,28 +567,27 @@ function rememberSuccess(memory, task, commitMessage) {
         memory.learned.successfulCommitMessages.unshift(commitMessage);
     }
     memory.learned.successfulCommitMessages = memory.learned.successfulCommitMessages.slice(0, 100);
+
+    delete memory.identicalFailureBursts[signature];
 }
 
 function rememberFailure(memory, task, reason) {
     const signature = stableTaskSignature(task);
-
     if (!memory.learned.failedTaskSignatures.includes(signature)) {
         memory.learned.failedTaskSignatures.unshift(signature);
     }
     memory.learned.failedTaskSignatures = memory.learned.failedTaskSignatures.slice(0, 200);
 
-    if (reason) {
-        const low = String(reason).toLowerCase();
-        if (low.includes("lint")) {
-            memory.learned.lintPatterns.unshift(reason);
-            memory.learned.lintPatterns = memory.learned.lintPatterns.slice(0, 50);
-        } else if (low.includes("build") || low.includes("typecheck") || low.includes("typescript")) {
-            memory.learned.buildPatterns.unshift(reason);
-            memory.learned.buildPatterns = memory.learned.buildPatterns.slice(0, 50);
-        } else if (low.includes("test")) {
-            memory.learned.testPatterns.unshift(reason);
-            memory.learned.testPatterns = memory.learned.testPatterns.slice(0, 50);
-        }
+    const low = String(reason || "").toLowerCase();
+    if (low.includes("lint")) {
+        memory.learned.lintPatterns.unshift(reason);
+        memory.learned.lintPatterns = memory.learned.lintPatterns.slice(0, 50);
+    } else if (low.includes("build") || low.includes("typecheck") || low.includes("typescript")) {
+        memory.learned.buildPatterns.unshift(reason);
+        memory.learned.buildPatterns = memory.learned.buildPatterns.slice(0, 50);
+    } else if (low.includes("test")) {
+        memory.learned.testPatterns.unshift(reason);
+        memory.learned.testPatterns = memory.learned.testPatterns.slice(0, 50);
     }
 }
 
@@ -555,7 +595,7 @@ function rememberNextOpportunities(memory, opportunities) {
     const next = unique((opportunities || []).map((item) => sanitizeOneLine(item, 220)).filter(Boolean));
     memory.learned.nextOpportunityPatterns = unique([
         ...next,
-        ...(memory.learned.nextOpportunityPatterns || [])
+        ...(memory.learned.nextOpportunityPatterns || []),
     ]).slice(0, 100);
 }
 
@@ -576,16 +616,14 @@ function rememberFileFailures(memory, files, reason) {
     const cleanFiles = unique((files || []).map(normalizeSlashes).filter(Boolean).filter((file) => !isProtectedFile(file)));
 
     for (const file of cleanFiles) {
-        const current = stats[file] && typeof stats[file] === "object" ? stats[file] : {
-            count: 0,
-            lastReason: "",
-            lastAt: null
-        };
+        const current = stats[file] && typeof stats[file] === "object"
+            ? stats[file]
+            : { count: 0, lastReason: "", lastAt: null };
 
         stats[file] = {
             count: Number(current.count || 0) + 1,
             lastReason: sanitizeOneLine(reason || "", 220),
-            lastAt: new Date().toISOString()
+            lastAt: new Date().toISOString(),
         };
     }
 
@@ -608,11 +646,9 @@ function collectFailureFiles(task, reason, implementation) {
     return unique([
         ...((task && Array.isArray(task.files)) ? task.files : []),
         ...extractRelevantFilesFromErrors(reason || ""),
-        ...((implementation && Array.isArray(implementation.files)) ? implementation.files.map((item) => item.path) : [])
+        ...((implementation && Array.isArray(implementation.files)) ? implementation.files.map((item) => item.path) : []),
     ]).filter(Boolean);
 }
-
-/* ========================= SHELL / GIT ========================= */
 
 function run(command, options = {}) {
     const result = spawnSync(command, {
@@ -620,14 +656,14 @@ function run(command, options = {}) {
         shell: true,
         encoding: "utf8",
         stdio: "pipe",
-        maxBuffer: 1024 * 1024 * 100
+        maxBuffer: 1024 * 1024 * 100,
     });
 
     return {
         ok: result.status === 0,
         code: result.status,
         stdout: result.stdout || "",
-        stderr: result.stderr || ""
+        stderr: result.stderr || "",
     };
 }
 
@@ -654,15 +690,12 @@ function stageAll() {
 
 function commitAll(message) {
     stageAll();
-
     const res = run(`git commit -m ${JSON.stringify(message)}`);
     const output = `${res.stdout}\n${res.stderr}`.trim();
-
     if (!res.ok) {
         if (/nothing to commit/i.test(output)) return false;
         throw new Error(`Commit falhou:\n${output}`);
     }
-
     return true;
 }
 
@@ -678,15 +711,11 @@ function rollbackHard() {
     const backup = new Map();
     for (const p of CONFIG.PROTECTED_FILES) {
         const full = abs(p);
-        if (exists(full)) {
-            backup.set(full, safeRead(full, ""));
-        }
+        if (exists(full)) backup.set(full, safeRead(full, ""));
     }
 
     const mainDoc = abs(CONFIG.MAIN_EVOLUTION_DOC);
-    if (exists(mainDoc)) {
-        backup.set(mainDoc, safeRead(mainDoc, ""));
-    }
+    if (exists(mainDoc)) backup.set(mainDoc, safeRead(mainDoc, ""));
 
     git("reset --hard", true);
     git("clean -fd", true);
@@ -706,7 +735,6 @@ function diffWorkingTree() {
 
 function ensureBranch() {
     if (!CONFIG.AUTO_BRANCH) return currentBranch();
-
     const target = `${CONFIG.BRANCH_PREFIX}/${nowDate()}`;
     const current = currentBranch();
     if (current === target) return current;
@@ -721,8 +749,6 @@ function ensureBranch() {
     return target;
 }
 
-/* ========================= STATUS / SCAN ========================= */
-
 function getStatusPorcelain() {
     const out = git("status --porcelain", true);
     return out ? out.split(/\r?\n/).filter(Boolean) : [];
@@ -731,15 +757,12 @@ function getStatusPorcelain() {
 function workingTreeDirty() {
     const lines = getStatusPorcelain();
     if (!lines.length) return false;
-
     if (!CONFIG.IGNORE_UNTRACKED_PROTECTED_FILES_ONLY) return true;
 
     for (const line of lines) {
         const candidate = line.slice(3).trim();
         const isUntracked = line.startsWith("??");
-        if (isUntracked && isProtectedFile(candidate)) {
-            continue;
-        }
+        if (isUntracked && isProtectedFile(candidate)) continue;
         return true;
     }
 
@@ -764,7 +787,8 @@ function walkFiles(dir, list = []) {
         }
 
         if (isIgnoredFile(entry.name)) continue;
-        if (!hasAllowedExtension(entry.name)) continue;
+        if (isBlockedFileName(entry.name)) continue;
+        if (!hasAllowedExtension(entry.name) && !isSpecialAllowedFile(entry.name)) continue;
         if (!fileLooksText(full)) continue;
 
         list.push(full);
@@ -789,12 +813,10 @@ function buildRepoIndex() {
         "nest-cli.json",
         "docker-compose.yml",
         "docker-compose.yaml",
-        ".env.example",
-        "prisma/schema.prisma"
+        "prisma/schema.prisma",
     ];
 
     const importantFiles = [];
-
     for (const name of importantNames) {
         const found = files.find((f) => rel(f).toLowerCase() === name.toLowerCase());
         if (found && !isProtectedFile(rel(found))) importantFiles.push(found);
@@ -812,7 +834,7 @@ function buildRepoIndex() {
         files,
         rels,
         importantFiles: merged.slice(0, CONFIG.MAX_CONTEXT_FILES),
-        repoHash: sha1(rels.join("\n"))
+        repoHash: sha1(rels.join("\n")),
     };
 }
 
@@ -823,7 +845,6 @@ function readFileContext(filePath, maxChars = CONFIG.MAX_FILE_CHARS) {
 
 function loadBlueprint() {
     const blueprintPath = path.join(CONFIG.REPO_PATH, CONFIG.BLUEPRINT_FILE);
-
     if (!exists(blueprintPath)) {
         throw new Error(`BLUEPRINT obrigatório não encontrado: ${CONFIG.BLUEPRINT_FILE}`);
     }
@@ -836,7 +857,7 @@ function loadBlueprint() {
     return {
         path: blueprintPath,
         content: truncate(blueprint, CONFIG.MAX_BLUEPRINT_CHARS),
-        hash: sha1(blueprint)
+        hash: sha1(blueprint),
     };
 }
 
@@ -850,24 +871,27 @@ function buildRepoSnapshot(index) {
             const pkg = JSON.parse(safeRead(packageJsonPath, "{}"));
             dependencySummary = [
                 ...Object.keys(pkg.dependencies || {}),
-                ...Object.keys(pkg.devDependencies || {})
+                ...Object.keys(pkg.devDependencies || {}),
             ];
 
-            packageSummary = JSON.stringify({
-                name: pkg.name || null,
-                version: pkg.version || null,
-                type: pkg.type || null,
-                scripts: pkg.scripts || {},
-                dependencies: Object.keys(pkg.dependencies || {}).slice(0, 100),
-                devDependencies: Object.keys(pkg.devDependencies || {}).slice(0, 100)
-            }, null, 2);
+            packageSummary = JSON.stringify(
+                {
+                    name: pkg.name || null,
+                    version: pkg.version || null,
+                    type: pkg.type || null,
+                    scripts: pkg.scripts || {},
+                    dependencies: Object.keys(pkg.dependencies || {}).slice(0, 100),
+                    devDependencies: Object.keys(pkg.devDependencies || {}).slice(0, 100),
+                },
+                null,
+                2
+            );
         } catch {
             packageSummary = truncate(safeRead(packageJsonPath, ""));
         }
     }
 
     const fileContexts = index.importantFiles.map((f) => readFileContext(f)).join("\n\n");
-
     const evolutionDocPath = abs(CONFIG.MAIN_EVOLUTION_DOC);
     const evolutionDocSummary = exists(evolutionDocPath)
         ? truncate(safeRead(evolutionDocPath, ""), CONFIG.EVOLUTION_DOC_CONTEXT_CHARS)
@@ -878,7 +902,7 @@ function buildRepoSnapshot(index) {
         dependencySummary,
         fileList: index.rels.slice(0, 1500).join("\n"),
         fileContexts,
-        evolutionDocSummary
+        evolutionDocSummary,
     };
 }
 
@@ -893,15 +917,9 @@ function collectFileContents(paths) {
         .join("\n\n");
 }
 
-/* ========================= COMMANDS ========================= */
-
 function detectProjectCommands() {
     const pkgPath = path.join(CONFIG.REPO_PATH, "package.json");
-    const result = {
-        verify: [],
-        test: []
-    };
-
+    const result = { verify: [], test: [] };
     if (!exists(pkgPath)) return result;
 
     try {
@@ -924,22 +942,18 @@ function detectProjectCommands() {
 
 function runCommands(commands, label) {
     const outputs = [];
-
     for (const cmd of commands) {
         log(`🧪 ${label}: ${cmd}`);
         const res = run(cmd, { cwd: CONFIG.REPO_PATH });
-
         outputs.push({
             command: cmd,
             ok: res.ok,
             code: res.code,
             stdout: truncate(res.stdout, 30000),
-            stderr: truncate(res.stderr, 30000)
+            stderr: truncate(res.stderr, 30000),
         });
-
         if (!res.ok) break;
     }
-
     return outputs;
 }
 
@@ -948,27 +962,25 @@ function summarizeCommandFailures(results) {
     if (!failed) return "";
     return [
         `COMMAND: ${failed.command}`,
-        `STDOUT:`,
+        "STDOUT:",
         failed.stdout || "(empty)",
-        `STDERR:`,
-        failed.stderr || "(empty)"
+        "STDERR:",
+        failed.stderr || "(empty)",
     ].join("\n");
 }
 
 function extractRelevantFilesFromErrors(text) {
     if (!text) return [];
-    const matches = String(text).match(/[A-Za-z0-9_./\\-]+\.(tsx|ts|jsx|js|json|css|scss|md|yml|yaml)/g) || [];
-    const normalized = matches
-        .map(normalizeSlashes)
-        .filter((p) => !isProtectedFile(p));
+    const matches =
+        String(text).match(/[A-Za-z0-9_./\\-]+\.(tsx|ts|jsx|js|json|css|scss|md|yml|yaml)/g) || [];
+    const normalized = matches.map(normalizeSlashes).filter((p) => !isProtectedFile(p));
     return unique(normalized);
 }
 
 function summarizeVerificationResults(verifyResults, testResults) {
-    return [
-        summarizeCommandFailures(verifyResults),
-        summarizeCommandFailures(testResults)
-    ].filter(Boolean).join("\n\n");
+    return [summarizeCommandFailures(verifyResults), summarizeCommandFailures(testResults)]
+        .filter(Boolean)
+        .join("\n\n");
 }
 
 function mergeImplementations(baseImpl, nextImpl) {
@@ -981,7 +993,7 @@ function mergeImplementations(baseImpl, nextImpl) {
         fileMap.set(normalizeSlashes(file.path), {
             path: normalizeSlashes(file.path),
             action: file.action || (exists(abs(file.path)) ? "update" : "create"),
-            content: String(file.content || "")
+            content: String(file.content || ""),
         });
     }
 
@@ -990,12 +1002,12 @@ function mergeImplementations(baseImpl, nextImpl) {
         files: [...fileMap.values()],
         delete_files: unique([
             ...(Array.isArray(baseImpl?.delete_files) ? baseImpl.delete_files : []),
-            ...(Array.isArray(nextImpl?.delete_files) ? nextImpl.delete_files : [])
+            ...(Array.isArray(nextImpl?.delete_files) ? nextImpl.delete_files : []),
         ].map(normalizeSlashes)),
         notes: unique([
             ...(Array.isArray(baseImpl?.notes) ? baseImpl.notes : []),
-            ...(Array.isArray(nextImpl?.notes) ? nextImpl.notes : [])
-        ])
+            ...(Array.isArray(nextImpl?.notes) ? nextImpl.notes : []),
+        ]),
     };
 }
 
@@ -1016,11 +1028,8 @@ function deriveNextOpportunities({ task, implementation, review }) {
     }
 
     opportunities.push(`Monitor regressions after ${sanitizeOneLine(task?.title || "recent delivery", 120)} and harden validation where needed`);
-
     return unique(opportunities).slice(0, 4);
 }
-
-/* ========================= MAIN DOCUMENT EVOLUTION ========================= */
 
 function buildEvolutionEntry({ task, implementation, review, commitMessage, nextOpportunities }) {
     const touchedFiles = implementation?.files?.map((file) => file.path) || [];
@@ -1035,12 +1044,12 @@ function buildEvolutionEntry({ task, implementation, review, commitMessage, next
         `- goal: ${sanitizeOneLine(task.goal, 300)}`,
         `- commit: ${sanitizeOneLine(commitMessage || task.commit_message || "", 220)}`,
         `- files changed: ${touchedFiles.length ? touchedFiles.join(", ") : "none"}`,
-        deletedFiles.length ? `- files deleted: ${deletedFiles.join(", ")}` : `- files deleted: none`,
+        deletedFiles.length ? `- files deleted: ${deletedFiles.join(", ")}` : "- files deleted: none",
         `- implementation summary: ${sanitizeOneLine(implementation?.summary || "completed successfully", 320)}`,
         `- review reason: ${sanitizeOneLine(review?.reason || "approved", 220)}`,
         `- notes:\n${listToBullets(notes)}`,
         `- warnings:\n${listToBullets(warnings)}`,
-        `- next opportunities:\n${listToBullets(nextOpportunities)}`
+        `- next opportunities:\n${listToBullets(nextOpportunities)}`,
     ].join("\n");
 }
 
@@ -1059,11 +1068,7 @@ function upsertEvolutionSection(originalContent, entry) {
     const idx = text.indexOf(marker);
     const before = text.slice(0, idx + marker.length).trimEnd();
     const after = text.slice(idx + marker.length).trim();
-
-    const blocks = after
-        ? after.split(/\n(?=###\s)/g).map((chunk) => chunk.trim()).filter(Boolean)
-        : [];
-
+    const blocks = after ? after.split(/\n(?=###\s)/g).map((chunk) => chunk.trim()).filter(Boolean) : [];
     const updated = trimEvolutionEntries([entry, ...blocks]).join("\n\n");
     return `${before}\n\n${updated}\n`;
 }
@@ -1081,277 +1086,24 @@ function updateMainEvolutionDoc({ task, implementation, review, commitMessage, m
         memory.metrics.blueprintUpdates = Number(memory.metrics.blueprintUpdates || 0) + 1;
     }
 
-    return {
-        path: rel(target),
-        nextOpportunities
-    };
-}
-
-/* ========================= AI ========================= */
-
-async function askModel(model, prompt) {
-    const response = await axios.post(
-        CONFIG.OLLAMA_URL,
-        {
-            model,
-            prompt,
-            stream: false
-        },
-        {
-            timeout: 1000 * 60 * 10
-        }
-    );
-
-    return response.data.response || "";
+    return { path: rel(target), nextOpportunities };
 }
 
 function buildBacklogPlannerPrompt({ blueprint, snapshot, memory, branch }) {
-    return `
-You are an autonomous principal software engineer evolving a real production system.
-
-SOURCE OF TRUTH:
-The blueprint below defines the product, architecture, goals, and constraints.
-You must obey it strictly.
-
-BLUEPRINT:
-${blueprint.content}
-
-CURRENT BRANCH:
-${branch}
-
-PACKAGE SUMMARY:
-${snapshot.packageSummary}
-
-KNOWN FILES:
-${snapshot.fileList}
-
-IMPORTANT FILE EXCERPTS:
-${snapshot.fileContexts}
-
-MAIN EVOLUTION DOCUMENT EXCERPT:
-${snapshot.evolutionDocSummary || "(empty)"}
-
-KNOWN DEPENDENCIES:
-${JSON.stringify(snapshot.dependencySummary.slice(0, 120), null, 2)}
-
-LEARNED SUCCESSES:
-${JSON.stringify(memory.accepted.slice(0, 10), null, 2)}
-
-LEARNED FAILURES:
-${JSON.stringify(memory.failed.slice(0, 10), null, 2)}
-
-PREVIOUS SUCCESSFUL TASK SIGNATURES:
-${JSON.stringify(memory.learned.successfulTaskSignatures.slice(0, 20), null, 2)}
-
-PREVIOUS FAILED TASK SIGNATURES:
-${JSON.stringify(memory.learned.failedTaskSignatures.slice(0, 20), null, 2)}
-
-HOT FILES WITH RECENT FAILURES:
-${JSON.stringify(getHotFiles(memory), null, 2)}
-
-LEARNED NEXT OPPORTUNITIES:
-${JSON.stringify((memory.learned.nextOpportunityPatterns || []).slice(0, 20), null, 2)}
-
-CRITICAL RULES:
-- Read the blueprint and continuously create useful tasks forever
-- Generate tasks in these categories whenever relevant: product, performance, security, optimization, bugfix, tests, refactor, dx
-- Prefer features that move the product forward, then hardening/performance/security
-- Propose ONLY improvements aligned with the existing system
-- DO NOT introduce new frameworks or platforms unless already present in dependencies or files
-- DO NOT introduce: ${CONFIG.FORBIDDEN_TECH_KEYWORDS.join(", ")}
-- NEVER suggest protected/internal files
-- Prefer improving existing modules, bugfixes, tests, validation, security hardening, performance, DX
-- Do not suggest generic rewrites unless clearly supported by existing codebase
-- If a technology is not clearly present, do not propose it
-- Only propose small or medium shippable tasks
-- Max ${CONFIG.MAX_FILES_PER_TASK} files per task
-- Always include real file paths when possible
-- Generate at least a mix of feature/product and hardening tasks
-- Consider previously completed tasks and the auto evolution log so the project keeps evolving instead of repeating itself
-
-CRITICAL OUTPUT RULES:
-- Return ONLY JSON
-- No markdown
-- No code fences
-- No explanation before or after JSON
-
-Return ONLY valid JSON in this exact shape:
-{
-  "summary": "short summary of repo direction",
-  "tasks": [
-    {
-      "id": "task-short-id",
-      "title": "short title",
-      "category": "security|performance|product|optimization|bugfix|refactor|dx|tests",
-      "priority": "high|medium|low",
-      "goal": "what should be improved",
-      "why": "why this matters",
-      "files": ["real/path1", "real/path2"],
-      "new_files_allowed": true,
-      "commit_message": "feat/fix/chore/test/refactor/perf: concise message"
-    }
-  ]
-}
-`.trim();
+    return `You are an autonomous principal software engineer evolving a real production system.\n\nSOURCE OF TRUTH:\nThe blueprint below defines the product, architecture, goals, and constraints.\nYou must obey it strictly.\n\nBLUEPRINT:\n${blueprint.content}\n\nCURRENT BRANCH:\n${branch}\n\nPACKAGE SUMMARY:\n${snapshot.packageSummary}\n\nKNOWN FILES:\n${snapshot.fileList}\n\nIMPORTANT FILE EXCERPTS:\n${snapshot.fileContexts}\n\nMAIN EVOLUTION DOCUMENT EXCERPT:\n${snapshot.evolutionDocSummary || "(empty)"}\n\nKNOWN DEPENDENCIES:\n${JSON.stringify(snapshot.dependencySummary.slice(0, 120), null, 2)}\n\nLEARNED SUCCESSES:\n${JSON.stringify(memory.accepted.slice(0, 10), null, 2)}\n\nLEARNED FAILURES:\n${JSON.stringify(memory.failed.slice(0, 10), null, 2)}\n\nPREVIOUS SUCCESSFUL TASK SIGNATURES:\n${JSON.stringify(memory.learned.successfulTaskSignatures.slice(0, 20), null, 2)}\n\nPREVIOUS FAILED TASK SIGNATURES:\n${JSON.stringify(memory.learned.failedTaskSignatures.slice(0, 20), null, 2)}\n\nHOT FILES WITH RECENT FAILURES:\n${JSON.stringify(getHotFiles(memory), null, 2)}\n\nLEARNED NEXT OPPORTUNITIES:\n${JSON.stringify((memory.learned.nextOpportunityPatterns || []).slice(0, 20), null, 2)}\n\nCRITICAL RULES:\n- Read the blueprint and continuously create useful tasks forever\n- Generate tasks in these categories whenever relevant: product, performance, security, optimization, bugfix, tests, refactor, dx\n- Prefer features that move the product forward, then hardening/performance/security\n- Propose ONLY improvements aligned with the existing system\n- DO NOT introduce new frameworks or platforms unless already present in dependencies or files\n- DO NOT introduce: ${CONFIG.FORBIDDEN_TECH_KEYWORDS.join(", ")}\n- NEVER suggest protected/internal files\n- NEVER suggest blocked env/config secret files such as .env or .env.example\n- Prefer improving existing modules, bugfixes, tests, validation, security hardening, performance, DX\n- Only propose small or medium shippable tasks\n- Max ${CONFIG.MAX_FILES_PER_TASK} files per task\n- Always include real file paths when possible\n- Consider previously completed tasks and the auto evolution log so the project keeps evolving instead of repeating itself\n\nReturn ONLY valid JSON in this exact shape:\n{\n  "summary": "short summary of repo direction",\n  "tasks": [\n    {\n      "id": "task-short-id",\n      "title": "short title",\n      "category": "security|performance|product|optimization|bugfix|refactor|dx|tests",\n      "priority": "high|medium|low",\n      "goal": "what should be improved",\n      "why": "why this matters",\n      "files": ["real/path1", "real/path2"],\n      "new_files_allowed": true,\n      "commit_message": "feat/fix/chore/test/refactor/perf: concise message"\n    }\n  ]\n}`;
 }
 
 function buildExecutorPrompt({ blueprint, task, fileContexts, commands, memory }) {
-    return `
-You are implementing one task in a production codebase.
-
-SOURCE OF TRUTH:
-${blueprint.content}
-
-TASK:
-${JSON.stringify(task, null, 2)}
-
-PROJECT COMMANDS:
-${JSON.stringify(commands, null, 2)}
-
-CURRENT FILES:
-${fileContexts}
-
-LEARNED FAILURES:
-${JSON.stringify(memory.failed.slice(0, 8), null, 2)}
-
-CRITICAL IMPLEMENTATION RULES:
-- Implement ONLY this task
-- Respect the blueprint and current stack
-- Keep scope safe but COMPLETE
-- Do not modify unrelated files
-- Use exact relative repo paths
-- Existing files must be fully rewritten in output
-- New files only if task justifies it
-- Focus on delivering working code that passes lint, typecheck, build and tests
-- If verification fails later, the system will try to self-heal, so prefer root-cause fixes over superficial patches
-- NEVER modify or access protected files
-- Never introduce forbidden technologies
-
-CRITICAL OUTPUT RULES:
-- Output MUST be valid JSON
-- Do not use markdown fences
-- Do not include explanations
-- Return ONLY JSON
-- All strings must be properly escaped
-- If file content contains quotes/newlines, escape them correctly
-- You MAY use backticks around file content value if needed, but final output must still be valid JSON or easily repairable
-
-Return ONLY valid JSON in this exact shape:
-{
-  "summary": "what changed",
-  "files": [
-    {
-      "path": "relative/path.ext",
-      "action": "update|create",
-      "content": "full file content"
-    }
-  ],
-  "delete_files": [],
-  "notes": ["important note 1", "important note 2"]
-}
-`.trim();
+    return `You are implementing one task in a production codebase.\n\nSOURCE OF TRUTH:\n${blueprint.content}\n\nTASK:\n${JSON.stringify(task, null, 2)}\n\nPROJECT COMMANDS:\n${JSON.stringify(commands, null, 2)}\n\nCURRENT FILES:\n${fileContexts}\n\nLEARNED FAILURES:\n${JSON.stringify(memory.failed.slice(0, 8), null, 2)}\n\nCRITICAL IMPLEMENTATION RULES:\n- Implement ONLY this task\n- Respect the blueprint and current stack\n- Keep scope safe but COMPLETE\n- Do not modify unrelated files\n- Do not modify .env, .env.example or protected files\n- Use exact relative repo paths\n- Existing files must be fully rewritten in output\n- New files only if task justifies it\n- Focus on delivering working code that passes lint, typecheck, build and tests\n- NEVER modify or access protected files\n- Never introduce forbidden technologies\n\nReturn ONLY valid JSON in this exact shape:\n{\n  "summary": "what changed",\n  "files": [\n    {\n      "path": "relative/path.ext",\n      "action": "update|create",\n      "content": "full file content"\n    }\n  ],\n  "delete_files": [],\n  "notes": ["important note 1", "important note 2"]\n}`;
 }
 
 function buildReviewerPrompt({ blueprint, task, implementation, diff }) {
-    return `
-You are a strict senior reviewer.
-
-SOURCE OF TRUTH:
-${blueprint.content}
-
-TASK:
-${JSON.stringify(task, null, 2)}
-
-IMPLEMENTATION:
-${JSON.stringify(implementation, null, 2)}
-
-DIFF:
-${truncate(diff, 45000)}
-
-Approve only if:
-- it matches the blueprint
-- it matches the task
-- files are relevant
-- risk is acceptable
-- code is coherent
-- no obvious breakage
-- no secrets or destructive operations
-- no unrelated changes
-- no protected files are touched
-- no new frameworks outside current stack
-
-CRITICAL OUTPUT RULES:
-- Return ONLY JSON
-- No markdown
-- No explanation
-
-Return ONLY valid JSON:
-{
-  "verdict": "APPROVED|REJECTED",
-  "reason": "short reason",
-  "warnings": ["warning 1"],
-  "suggested_commit_message": "optional improved commit message"
-}
-`.trim();
+    return `You are a strict senior reviewer.\n\nSOURCE OF TRUTH:\n${blueprint.content}\n\nTASK:\n${JSON.stringify(task, null, 2)}\n\nIMPLEMENTATION:\n${JSON.stringify(implementation, null, 2)}\n\nDIFF:\n${truncate(diff, 45000)}\n\nApprove only if:\n- it matches the blueprint\n- it matches the task\n- files are relevant\n- risk is acceptable\n- code is coherent\n- no obvious breakage\n- no secrets or destructive operations\n- no unrelated changes\n- no protected files are touched\n- no blocked config files like .env.example are touched\n- no new frameworks outside current stack\n\nReturn ONLY valid JSON:\n{\n  "verdict": "APPROVED|REJECTED",\n  "reason": "short reason",\n  "warnings": ["warning 1"],\n  "suggested_commit_message": "optional improved commit message"\n}`;
 }
 
 function buildSelfHealPrompt({ blueprint, task, implementation, failedSummary, currentFiles, commands }) {
-    return `
-You are a senior engineer fixing a broken codebase.
-
-SOURCE OF TRUTH:
-${blueprint.content}
-
-TASK:
-${JSON.stringify(task, null, 2)}
-
-PREVIOUS IMPLEMENTATION:
-${JSON.stringify(implementation, null, 2)}
-
-PROJECT COMMANDS:
-${JSON.stringify(commands, null, 2)}
-
-FAILURE OUTPUT (VERY IMPORTANT):
-${failedSummary}
-
-CURRENT FILES AND ERROR CONTEXT:
-${currentFiles}
-
-CRITICAL RULES:
-- You MUST fix ALL errors until the project passes
-- Fix lint, type errors, build errors, import errors, path alias issues, runtime issues and tests
-- You are allowed to refactor the affected files if necessary
-- You can modify any file directly related to the failure
-- Keep changes minimal but COMPLETE
-- Do not introduce new frameworks
-- Do not touch protected files
-- Prioritize actual delivery over partial changes
-- For TypeScript errors, fix the root typing issue, not just the symptom
-- If the first fix reveals a second error, continue fixing the new root cause
-
-CRITICAL OUTPUT RULES:
-- Return ONLY JSON
-- No markdown
-- No explanation
-- All strings must be escaped correctly
-
-RETURN ONLY VALID JSON:
-{
-  "summary": "what was fixed",
-  "files": [
-    {
-      "path": "relative/path.ext",
-      "action": "update|create",
-      "content": "full file content"
-    }
-  ],
-  "delete_files": [],
-  "notes": ["..."]
+    return `You are a senior engineer fixing a broken codebase.\n\nSOURCE OF TRUTH:\n${blueprint.content}\n\nTASK:\n${JSON.stringify(task, null, 2)}\n\nPREVIOUS IMPLEMENTATION:\n${JSON.stringify(implementation, null, 2)}\n\nPROJECT COMMANDS:\n${JSON.stringify(commands, null, 2)}\n\nFAILURE OUTPUT (VERY IMPORTANT):\n${failedSummary}\n\nCURRENT FILES AND ERROR CONTEXT:\n${currentFiles}\n\nCRITICAL RULES:\n- You MUST fix ALL errors until the project passes\n- Fix lint, type errors, build errors, import errors, path alias issues, runtime issues and tests\n- You can modify any file directly related to the failure\n- Keep changes minimal but COMPLETE\n- Do not introduce new frameworks\n- Do not touch protected files\n- Do not touch .env, .env.example or secret files\n- Prioritize actual delivery over partial changes\n\nRETURN ONLY VALID JSON:\n{\n  "summary": "what was fixed",\n  "files": [\n    {\n      "path": "relative/path.ext",\n      "action": "update|create",\n      "content": "full file content"\n    }\n  ],\n  "delete_files": [],\n  "notes": ["..."]\n}`;
 }
-`.trim();
-}
-
-/* ========================= VALIDATION ========================= */
 
 function detectForbiddenKeywordsInTask(task) {
     const serialized = JSON.stringify(task).toLowerCase();
@@ -1359,13 +1111,8 @@ function detectForbiddenKeywordsInTask(task) {
 }
 
 function validateBacklog(backlog, repoIndex, memory) {
-    if (!backlog || typeof backlog !== "object") {
-        throw new Error("Backlog inválido.");
-    }
-
-    if (!Array.isArray(backlog.tasks)) {
-        throw new Error("Backlog sem tasks.");
-    }
+    if (!backlog || typeof backlog !== "object") throw new Error("Backlog inválido.");
+    if (!Array.isArray(backlog.tasks)) throw new Error("Backlog sem tasks.");
 
     const realFiles = new Set(repoIndex.rels);
     const cleaned = [];
@@ -1385,6 +1132,7 @@ function validateBacklog(backlog, repoIndex, memory) {
         const validFiles = files
             .map(normalizeSlashes)
             .filter((f) => !isProtectedFile(f))
+            .filter((f) => !isBlockedFileName(f))
             .filter((f) => realFiles.has(f));
 
         const normalizedTask = {
@@ -1396,13 +1144,10 @@ function validateBacklog(backlog, repoIndex, memory) {
             why: String(task.why || ""),
             files: validFiles.slice(0, CONFIG.MAX_FILES_PER_TASK),
             new_files_allowed: Boolean(task.new_files_allowed),
-            commit_message: String(task.commit_message || `chore: ${task.title}`)
+            commit_message: String(task.commit_message || `chore: ${task.title}`),
         };
 
-        if (!normalizedTask.files.length && !normalizedTask.new_files_allowed) {
-            continue;
-        }
-
+        if (!normalizedTask.files.length && !normalizedTask.new_files_allowed) continue;
         cleaned.push(normalizedTask);
     }
 
@@ -1410,64 +1155,92 @@ function validateBacklog(backlog, repoIndex, memory) {
     return backlog;
 }
 
-function validateImplementation(impl, task) {
-    if (!impl || typeof impl !== "object") {
-        throw new Error("Implementação inválida.");
+function sanitizeImplementation(impl, task) {
+    if (!impl || typeof impl !== "object") throw new Error("Implementação inválida.");
+    if (!Array.isArray(impl.files)) impl.files = [];
+    if (!Array.isArray(impl.delete_files)) impl.delete_files = [];
+    if (!Array.isArray(impl.notes)) impl.notes = [];
+
+    const skipped = [];
+    const cleanedFiles = [];
+
+    for (const f of impl.files) {
+        if (!f || typeof f.path !== "string") {
+            skipped.push({ path: "(unknown)", reason: "invalid_path", fatal: false });
+            continue;
+        }
+
+        const eligibility = classifyFileEligibility(f.path);
+        if (!eligibility.allowed) {
+            skipped.push({ path: normalizeSlashes(f.path), reason: eligibility.reason, fatal: eligibility.fatal });
+            if (eligibility.fatal) {
+                const err = new Error(`Tentativa de alterar arquivo protegido: ${f.path}`);
+                err.code = "FATAL_PROTECTED_FILE";
+                throw err;
+            }
+            continue;
+        }
+
+        if (!["update", "create"].includes(f.action)) {
+            skipped.push({ path: normalizeSlashes(f.path), reason: `invalid_action:${f.action}`, fatal: false });
+            continue;
+        }
+
+        if (typeof f.content !== "string") {
+            skipped.push({ path: normalizeSlashes(f.path), reason: "invalid_content", fatal: false });
+            continue;
+        }
+
+        if (f.action === "create" && !CONFIG.ALLOW_NEW_FILES && !task.new_files_allowed) {
+            skipped.push({ path: normalizeSlashes(f.path), reason: "create_not_allowed", fatal: false });
+            continue;
+        }
+
+        cleanedFiles.push({
+            path: normalizeSlashes(f.path),
+            action: f.action,
+            content: String(f.content),
+        });
     }
 
-    if (!Array.isArray(impl.files)) {
-        throw new Error("Implementação sem files.");
+    const cleanedDeletes = [];
+    for (const delPath of impl.delete_files) {
+        const eligibility = classifyFileEligibility(delPath);
+        if (!eligibility.allowed || eligibility.fatal) {
+            skipped.push({ path: normalizeSlashes(delPath), reason: `delete_${eligibility.reason}`, fatal: Boolean(eligibility.fatal) });
+            continue;
+        }
+        cleanedDeletes.push(normalizeSlashes(delPath));
     }
 
-    if (!Array.isArray(impl.delete_files)) {
-        impl.delete_files = [];
+    if (cleanedDeletes.length > 0 && !CONFIG.ALLOW_DELETE_FILES) {
+        throw new Error("Delete de arquivos bloqueado pela configuração.");
+    }
+
+    impl.files = cleanedFiles;
+    impl.delete_files = cleanedDeletes;
+
+    if (skipped.length) {
+        impl.notes.unshift(
+            `Skipped files: ${skipped.map((item) => `${item.path} [${item.reason}]`).join(", ")}`
+        );
     }
 
     if (impl.files.length === 0 && impl.delete_files.length === 0) {
-        throw new Error("Implementação vazia.");
+        const err = new Error(
+            `Implementação sanitizada ficou vazia. Ignorados: ${skipped.map((item) => `${item.path} [${item.reason}]`).join(", ")}`
+        );
+        err.code = skipped.some((item) => String(item.reason).startsWith("blocked_"))
+            ? "NON_FATAL_INVALID_FILE_SELECTION"
+            : "EMPTY_IMPLEMENTATION";
+        throw err;
     }
 
     if (impl.files.length > CONFIG.MAX_FILES_PER_TASK + 8) {
         throw new Error("Implementação alterou arquivos demais.");
     }
 
-    for (const f of impl.files) {
-        if (!f.path || typeof f.path !== "string") {
-            throw new Error("Arquivo sem path.");
-        }
-
-        if (!["update", "create"].includes(f.action)) {
-            throw new Error(`Ação inválida em ${f.path}`);
-        }
-
-        if (typeof f.content !== "string") {
-            throw new Error(`Conteúdo inválido em ${f.path}`);
-        }
-
-        if (!hasAllowedExtension(f.path)) {
-            throw new Error(`Extensão não permitida: ${f.path}`);
-        }
-
-        if (isProtectedFile(f.path)) {
-            throw new Error(`Tentativa de alterar arquivo protegido: ${f.path}`);
-        }
-
-        if (f.action === "create" && !CONFIG.ALLOW_NEW_FILES && !task.new_files_allowed) {
-            throw new Error(`Criação de arquivo não permitida: ${f.path}`);
-        }
-    }
-
-    for (const d of impl.delete_files || []) {
-        if (isProtectedFile(d)) {
-            throw new Error(`Tentativa de deletar arquivo protegido: ${d}`);
-        }
-    }
-
-    if (impl.delete_files.length > 0 && !CONFIG.ALLOW_DELETE_FILES) {
-        throw new Error("Delete de arquivos bloqueado pela configuração.");
-    }
-
-    return impl;
+    return { impl, skipped };
 }
 
 function scoreTask(task) {
@@ -1479,21 +1252,38 @@ function scoreTask(task) {
         product: 80,
         tests: 75,
         refactor: 60,
-        dx: 50
+        dx: 50,
     };
 
-    const priorityScore = {
-        high: 30,
-        medium: 20,
-        low: 10
-    };
-
+    const priorityScore = { high: 30, medium: 20, low: 10 };
     return (categoryScore[task.category] || 0) + (priorityScore[task.priority] || 0);
 }
 
 function countTaskFailures(memory, task) {
     const signature = stableTaskSignature(task);
     return memory.failed.filter((f) => f?.signature === signature).length;
+}
+
+function countIdenticalFailures(memory, task, errorSignature) {
+    const signature = stableTaskSignature(task);
+    const key = `${signature}:${errorSignature}`;
+    return Number(memory.identicalFailureBursts[key] || 0);
+}
+
+function registerIdenticalFailure(memory, task, reason) {
+    const signature = stableTaskSignature(task);
+    const errorSignature = stableTextSignature(reason);
+    const key = `${signature}:${errorSignature}`;
+    const current = Number(memory.identicalFailureBursts[key] || 0) + 1;
+    memory.identicalFailureBursts[key] = current;
+    return { key, count: current, errorSignature };
+}
+
+function clearTaskFailureBursts(memory, task) {
+    const signature = stableTaskSignature(task);
+    for (const key of Object.keys(memory.identicalFailureBursts || {})) {
+        if (key.startsWith(`${signature}:`)) delete memory.identicalFailureBursts[key];
+    }
 }
 
 function wasTaskSuccessful(memory, task) {
@@ -1506,7 +1296,6 @@ function pickNextTask(memory) {
     if (!backlog.length) return null;
 
     const hotFiles = new Set(getHotFiles(memory));
-
     const candidates = backlog
         .filter((task) => !wasTaskSuccessful(memory, task))
         .filter((task) => countTaskFailures(memory, task) < CONFIG.MAX_REPEAT_FAILURES_PER_TASK)
@@ -1516,7 +1305,7 @@ function pickNextTask(memory) {
 
             const aHot = (a.files || []).filter((file) => hotFiles.has(file)).length;
             const bHot = (b.files || []).filter((file) => hotFiles.has(file)).length;
-            if (aHot !== bHot) return bHot - aHot;
+            if (aHot !== bHot) return aHot - bHot;
 
             return scoreTask(b) - scoreTask(a);
         });
@@ -1528,23 +1317,18 @@ function removeTaskFromBacklog(memory, taskId) {
     memory.backlog = (memory.backlog || []).filter((t) => t.id !== taskId);
 }
 
-/* ========================= FILE APPLICATION ========================= */
-
 function backupFiles(paths) {
     const map = new Map();
-
     for (const p of paths) {
         const full = abs(p);
         map.set(p, exists(full) ? safeRead(full, "") : null);
     }
-
     return map;
 }
 
 function restoreBackup(backupMap) {
     for (const [filePath, content] of backupMap.entries()) {
         const full = abs(filePath);
-
         if (content === null) {
             if (exists(full)) fs.unlinkSync(full);
         } else {
@@ -1555,15 +1339,11 @@ function restoreBackup(backupMap) {
 
 function applyImplementation(impl) {
     const touched = [];
-
     for (const file of impl.files) {
-        const full = abs(file.path);
-
         if (isProtectedFile(file.path)) {
             throw new Error(`Arquivo protegido bloqueado: ${file.path}`);
         }
-
-        safeWrite(full, file.content);
+        safeWrite(abs(file.path), file.content);
         touched.push(normalizeSlashes(file.path));
     }
 
@@ -1571,7 +1351,6 @@ function applyImplementation(impl) {
         if (isProtectedFile(delPath)) {
             throw new Error(`Arquivo protegido bloqueado para delete: ${delPath}`);
         }
-
         const full = abs(delPath);
         if (exists(full)) {
             fs.unlinkSync(full);
@@ -1587,44 +1366,34 @@ function collectContextsForTask(task) {
     return collectFileContents(paths);
 }
 
-/* ========================= SAFETY ========================= */
-
 function containsDangerousContent(value) {
     const text = JSON.stringify(value);
-
     const patterns = [
         /rm\s+-rf/gi,
         /DROP\s+TABLE/gi,
         /TRUNCATE\s+TABLE/gi,
         /-----BEGIN (?:RSA|OPENSSH|PRIVATE KEY)-----/g,
-        /process\.env\.[A-Z0-9_]+\s*=\s*["'`]/g
+        /process\.env\.[A-Z0-9_]+\s*=\s*["'`]/g,
     ];
-
     return patterns.some((p) => p.test(text));
 }
 
 function ensureSafeStart() {
-    if (!hasGitRepo()) {
-        throw new Error("Este diretório não é um repositório git.");
-    }
-
+    if (!hasGitRepo()) throw new Error("Este diretório não é um repositório git.");
     if (CONFIG.STRICT_CLEAN_START && workingTreeDirty()) {
         throw new Error("Há alterações não commitadas. Limpe o repo antes de iniciar o agente.");
     }
 }
 
-/* ========================= CORE AI STEPS ========================= */
-
 async function askAndParseJson(model, prompt, label, validator = null) {
     let lastRaw = "";
 
-    for (let i = 1; i <= CONFIG.MAX_PARSE_RETRIES; i++) {
+    for (let i = 1; i <= CONFIG.MAX_PARSE_RETRIES; i += 1) {
         lastRaw = await askModel(model, prompt);
-
         let parsed = parseJsonSafe(lastRaw);
 
         if (!parsed) {
-            for (let j = 1; j <= CONFIG.MAX_JSON_REPAIR_ATTEMPTS; j++) {
+            for (let j = 1; j <= CONFIG.MAX_JSON_REPAIR_ATTEMPTS; j += 1) {
                 parsed = await repairJsonWithModel(CONFIG.MODEL_JSON_REPAIR, lastRaw, label);
                 if (parsed) break;
             }
@@ -1635,16 +1404,7 @@ async function askAndParseJson(model, prompt, label, validator = null) {
         }
 
         log(`⚠️ falha ao parsear ${label}, tentativa ${i}/${CONFIG.MAX_PARSE_RETRIES}`);
-
-        prompt += `
-
-IMPORTANT:
-Return ONLY valid JSON.
-Do not use markdown.
-Do not include explanations.
-Ensure all strings are properly escaped.
-The response must be directly parsable by JSON.parse.
-`;
+        prompt += `\n\nIMPORTANT:\nReturn ONLY valid JSON.\nDo not use markdown.\nDo not include explanations.\nEnsure all strings are properly escaped.\nThe response must be directly parsable by JSON.parse.`;
     }
 
     throw new Error(`Falha ao parsear ${label}.\nRAW:\n${truncate(lastRaw, 8000)}`);
@@ -1652,91 +1412,46 @@ The response must be directly parsable by JSON.parse.
 
 async function generateBacklog(memory, blueprint, repoIndex) {
     const snapshot = buildRepoSnapshot(repoIndex);
-    const prompt = buildBacklogPlannerPrompt({
-        blueprint,
-        snapshot,
-        memory,
-        branch: currentBranch()
-    });
-
-    const parsed = await askAndParseJson(
-        CONFIG.MODEL_PLANNER,
-        prompt,
-        "backlog do planner",
-        isValidBacklog
-    );
-
+    const prompt = buildBacklogPlannerPrompt({ blueprint, snapshot, memory, branch: currentBranch() });
+    const parsed = await askAndParseJson(CONFIG.MODEL_PLANNER, prompt, "backlog do planner", isValidBacklog);
     return validateBacklog(parsed, repoIndex, memory);
 }
 
 async function generateImplementation(task, blueprint, memory) {
     const fileContexts = collectContextsForTask(task);
     const commands = detectProjectCommands();
-
-    const prompt = buildExecutorPrompt({
-        blueprint,
-        task,
-        fileContexts,
-        commands,
-        memory
-    });
-
-    const impl = await askAndParseJson(
-        CONFIG.MODEL_EXECUTOR,
-        prompt,
-        "implementação",
-        isValidImplementation
-    );
+    const prompt = buildExecutorPrompt({ blueprint, task, fileContexts, commands, memory });
+    const impl = await askAndParseJson(CONFIG.MODEL_EXECUTOR, prompt, "implementação", isValidImplementation);
 
     if (!isValidImplementation(impl)) {
         throw new Error("INVALID_IMPLEMENTATION_STRUCTURE");
     }
 
-    validateImplementation(impl, task);
-
-    if (containsDangerousContent(impl)) {
+    const sanitized = sanitizeImplementation(impl, task);
+    if (containsDangerousContent(sanitized.impl)) {
         throw new Error("Mudança bloqueada por conteúdo potencialmente perigoso.");
     }
-
-    return impl;
+    return sanitized;
 }
 
 async function reviewImplementation(task, blueprint, implementation) {
-    const prompt = buildReviewerPrompt({
-        blueprint,
-        task,
-        implementation,
-        diff: diffWorkingTree()
-    });
-
-    return askAndParseJson(
-        CONFIG.MODEL_REVIEWER,
-        prompt,
-        "review",
-        isValidReview
-    );
+    const prompt = buildReviewerPrompt({ blueprint, task, implementation, diff: diffWorkingTree() });
+    return askAndParseJson(CONFIG.MODEL_REVIEWER, prompt, "review", isValidReview);
 }
 
 function runVerification(memory) {
     const commands = detectProjectCommands();
-
     const verifyResults = runCommands(commands.verify, "verify");
     const verifyOk = verifyResults.every((x) => x.ok);
-
-    if (verifyOk) memory.metrics.verifyPass++;
-    else memory.metrics.verifyFail++;
+    if (verifyOk) memory.metrics.verifyPass += 1;
+    else memory.metrics.verifyFail += 1;
 
     const testResults = runCommands(commands.test, "test");
     const testOk = testResults.every((x) => x.ok);
+    if (testOk) memory.metrics.testPass += 1;
+    else memory.metrics.testFail += 1;
 
-    if (testOk) memory.metrics.testPass++;
-    else memory.metrics.testFail++;
-
-    return {
-        ok: verifyOk && testOk,
-        verifyResults,
-        testResults
-    };
+    return { ok: verifyOk && testOk, verifyResults, testResults };
 }
 
 async function trySelfHeal({ blueprint, task, implementation, checks, memory }) {
@@ -1744,7 +1459,7 @@ async function trySelfHeal({ blueprint, task, implementation, checks, memory }) 
     let currentImpl = implementation;
     const commands = detectProjectCommands();
 
-    for (let attempt = 1; attempt <= CONFIG.MAX_SELF_HEAL_ATTEMPTS; attempt++) {
+    for (let attempt = 1; attempt <= CONFIG.MAX_SELF_HEAL_ATTEMPTS; attempt += 1) {
         log(`🩹 self-heal attempt ${attempt}/${CONFIG.MAX_SELF_HEAL_ATTEMPTS}`);
 
         const errorFiles = extractRelevantFilesFromErrors(failedSummary);
@@ -1756,35 +1471,30 @@ async function trySelfHeal({ blueprint, task, implementation, checks, memory }) 
             implementation: currentImpl,
             failedSummary,
             currentFiles,
-            commands
+            commands,
         });
 
         let fixedImpl;
         try {
-            fixedImpl = await askAndParseJson(
-                CONFIG.MODEL_FIXER,
-                prompt,
-                "self-heal",
-                isValidImplementation
-            );
+            fixedImpl = await askAndParseJson(CONFIG.MODEL_FIXER, prompt, "self-heal", isValidImplementation);
         } catch (err) {
             debug("self-heal parse error:", err.message);
             continue;
         }
 
-        if (!isValidImplementation(fixedImpl)) {
+        try {
+            const sanitized = sanitizeImplementation(fixedImpl, task);
+            fixedImpl = sanitized.impl;
+        } catch (err) {
+            debug("self-heal sanitize error:", err.message);
             continue;
         }
 
-        validateImplementation(fixedImpl, task);
-
-        if (containsDangerousContent(fixedImpl)) {
-            continue;
-        }
+        if (containsDangerousContent(fixedImpl)) continue;
 
         const touchedPaths = unique([
             ...fixedImpl.files.map((f) => normalizeSlashes(f.path)),
-            ...(fixedImpl.delete_files || []).map((p) => normalizeSlashes(p))
+            ...(fixedImpl.delete_files || []).map((p) => normalizeSlashes(p)),
         ]);
 
         const backups = backupFiles(touchedPaths);
@@ -1794,17 +1504,16 @@ async function trySelfHeal({ blueprint, task, implementation, checks, memory }) 
             const newChecks = runVerification(memory);
 
             if (newChecks.ok) {
-                memory.metrics.selfHealSuccess++;
+                memory.metrics.selfHealSuccess += 1;
                 return {
                     ok: true,
                     implementation: mergeImplementations(currentImpl, fixedImpl),
-                    checks: newChecks
+                    checks: newChecks,
                 };
             }
 
             failedSummary = summarizeVerificationResults(newChecks.verifyResults, newChecks.testResults) || failedSummary;
             currentImpl = mergeImplementations(currentImpl, fixedImpl);
-
             log("⚠️ self-heal applied but ainda há erros; continuando a correção");
         } catch (err) {
             debug("self-heal apply error:", err.message);
@@ -1813,11 +1522,63 @@ async function trySelfHeal({ blueprint, task, implementation, checks, memory }) 
         }
     }
 
-    memory.metrics.selfHealFail++;
+    memory.metrics.selfHealFail += 1;
     return { ok: false };
 }
 
-/* ========================= MAIN LOOP ========================= */
+function shouldDropTaskAfterFailure(memory, task, errorMessage) {
+    const low = String(errorMessage || "").toLowerCase();
+    const identical = registerIdenticalFailure(memory, task, errorMessage);
+
+    const structuralPatterns = [
+        "non_fatal_invalid_file_selection",
+        "implementação sanitizada ficou vazia",
+        "extensão não permitida",
+        "blocked_extension",
+        "blocked_name:.env.example",
+        "arquivo protegido",
+    ];
+
+    const isStructural = structuralPatterns.some((pattern) => low.includes(pattern));
+    if (isStructural && identical.count >= CONFIG.MAX_IDENTICAL_ERROR_RETRIES) {
+        return true;
+    }
+
+    if (countTaskFailures(memory, task) + 1 >= CONFIG.MAX_REPEAT_FAILURES_PER_TASK) {
+        return true;
+    }
+
+    return false;
+}
+
+function registerFailureAndDecide(memory, task, reason, implementation) {
+    const failureEntry = {
+        at: new Date().toISOString(),
+        title: task.title,
+        category: task.category,
+        reason: sanitizeOneLine(reason, 400),
+        signature: stableTaskSignature(task),
+        error_signature: stableTextSignature(reason),
+    };
+
+    memory.failed.unshift(failureEntry);
+    memory.failed = memory.failed.slice(0, 300);
+    memory.metrics.lastErrorAt = new Date().toISOString();
+
+    rememberFailure(memory, task, reason);
+    rememberFileFailures(memory, collectFailureFiles(task, reason, implementation), reason);
+
+    const shouldDrop = shouldDropTaskAfterFailure(memory, task, reason);
+    if (shouldDrop) {
+        log("⛔ dropping task after repeated structural/identical failure");
+        removeTaskFromBacklog(memory, task.id);
+        clearTaskFailureBursts(memory, task);
+    } else {
+        log("🔁 keeping task for retry");
+    }
+
+    saveMemory(memory);
+}
 
 async function main() {
     acquireLock();
@@ -1835,37 +1596,35 @@ async function main() {
 
         const branch = ensureBranch();
 
-        log("🚀 AUTONOMOUS AGENT LEVEL 7 STARTED");
+        log("🚀 AUTONOMOUS AGENT LEVEL 7 STABLE STARTED");
         log("📁 repo:", CONFIG.REPO_PATH);
         log("📘 blueprint:", CONFIG.BLUEPRINT_FILE);
         log("📝 main evolution doc:", CONFIG.MAIN_EVOLUTION_DOC);
         log("🌿 branch:", branch);
 
-        for (let i = 0; i < CONFIG.MAX_ITERATIONS; i++) {
+        for (let i = 0; i < CONFIG.MAX_ITERATIONS; i += 1) {
             memory = loadMemory();
-            memory.metrics.iterations++;
+            memory.metrics.iterations += 1;
             saveMemory(memory);
 
             log("🧠 iteration", memory.metrics.iterations);
-
             let task = null;
 
             try {
                 if (!Array.isArray(memory.backlog) || memory.backlog.length === 0) {
                     log("🗺️ generating backlog from blueprint...");
                     const freshBacklog = await generateBacklog(memory, blueprint, buildRepoIndex());
-                    memory.metrics.plannerRuns++;
+                    memory.metrics.plannerRuns += 1;
                     memory.backlog = freshBacklog.tasks || [];
                     pushHistory(memory, {
                         type: "backlog_generated",
                         total: memory.backlog.length,
-                        summary: freshBacklog.summary || ""
+                        summary: freshBacklog.summary || "",
                     });
                     saveMemory(memory);
                 }
 
                 task = pickNextTask(memory);
-
                 if (!task) {
                     log("⏸️ no valid task available, regenerating backlog on next loop");
                     memory.backlog = [];
@@ -1877,279 +1636,145 @@ async function main() {
                 log(`🎯 task: [${task.category}/${task.priority}] ${task.title}`);
                 log("📌 goal:", task.goal);
 
-                memory.metrics.tasksExecuted++;
+                memory.metrics.tasksExecuted += 1;
                 saveMemory(memory);
 
-                let implementation = await generateImplementation(task, blueprint, memory);
+                const generated = await generateImplementation(task, blueprint, memory);
+                const implementation = generated.impl;
+
+                if (generated.skipped.length) {
+                    log(
+                        `🧹 sanitized implementation, skipped ${generated.skipped.length} file(s):`,
+                        generated.skipped.map((item) => `${item.path}[${item.reason}]`).join(", ")
+                    );
+                }
 
                 const touchedPaths = unique([
                     ...implementation.files.map((f) => normalizeSlashes(f.path)),
-                    ...(implementation.delete_files || []).map((p) => normalizeSlashes(p))
+                    ...(implementation.delete_files || []).map((p) => normalizeSlashes(p)),
                 ]);
 
                 const backups = backupFiles(touchedPaths);
 
                 try {
                     applyImplementation(implementation);
-                    memory.metrics.applied++;
-                    saveMemory(memory);
-                } catch (applyErr) {
+                } catch (err) {
                     restoreBackup(backups);
-                    rollbackHard();
-                    throw applyErr;
+                    throw err;
                 }
 
                 const review = await reviewImplementation(task, blueprint, implementation);
-
                 if (String(review.verdict || "").toUpperCase() !== "APPROVED") {
-                    memory.metrics.rejections++;
-                    restoreBackup(backups);
+                    memory.metrics.rejections += 1;
                     rollbackHard();
-
-                    const reason = review.reason || "review rejected";
-                    memory.failed.unshift({
-                        at: new Date().toISOString(),
-                        id: task.id,
-                        title: task.title,
-                        goal: task.goal,
-                        reason,
-                        signature: stableTaskSignature(task)
-                    });
-
-                    rememberFailure(memory, task, reason);
-                    rememberFileFailures(memory, collectFailureFiles(task, reason, implementation), reason);
-
-                    pushHistory(memory, {
-                        type: "task_rejected",
-                        id: task.id,
-                        title: task.title,
-                        reason
-                    });
-
-                    saveMemory(memory);
-                    log("❌ rejected:", reason);
-                    log("🔁 keeping task for retry");
+                    registerFailureAndDecide(memory, task, `review rejected: ${review.reason || "no reason"}`, implementation);
                     await sleep(CONFIG.LOOP_DELAY_MS);
                     continue;
                 }
 
-                memory.metrics.approvals++;
-                saveMemory(memory);
+                memory.metrics.approvals += 1;
+                const checks = runVerification(memory);
 
-                let checks = runVerification(memory);
-                let currentImplementation = implementation;
-                let healAttempts = 0;
-
-                while (!checks.ok && healAttempts < CONFIG.MAX_SELF_HEAL_ATTEMPTS) {
-                    healAttempts++;
-                    log(`🩹 healing loop ${healAttempts}/${CONFIG.MAX_SELF_HEAL_ATTEMPTS}`);
-
-                    const healed = await trySelfHeal({
-                        blueprint,
-                        task,
-                        implementation: currentImplementation,
-                        checks,
-                        memory
-                    });
-
-                    if (!healed.ok) {
-                        break;
-                    }
-
-                    currentImplementation = healed.implementation;
-                    implementation = healed.implementation;
-                    checks = healed.checks || runVerification(memory);
-
-                    if (checks.ok) {
-                        log("✅ fully healed and verified");
-                        break;
-                    }
-                }
+                let finalImplementation = implementation;
+                let finalChecks = checks;
 
                 if (!checks.ok) {
-                    restoreBackup(backups);
-                    rollbackHard();
-
-                    const failureReason = `verify/test failed\n${summarizeCommandFailures(checks.verifyResults)}\n${summarizeCommandFailures(checks.testResults)}`.trim();
-
-                    memory.failed.unshift({
-                        at: new Date().toISOString(),
-                        id: task.id,
-                        title: task.title,
-                        goal: task.goal,
-                        reason: failureReason,
-                        signature: stableTaskSignature(task)
-                    });
-
-                    rememberFailure(memory, task, failureReason);
-                    rememberFileFailures(memory, collectFailureFiles(task, failureReason, implementation), failureReason);
-
-                    const taskFailureCount = countTaskFailures(memory, task);
-                    if (taskFailureCount >= Math.max(2, Math.floor(CONFIG.MAX_REPEAT_FAILURES_PER_TASK / 2))) {
-                        try {
-                            const replannedTask = await replanTaskAfterFailures({
-                                blueprint,
-                                task,
-                                failureReason,
-                                memory
-                            });
-
-                            if (replannedTask) {
-                                removeTaskFromBacklog(memory, task.id);
-                                memory.backlog.unshift(replannedTask);
-                                pushHistory(memory, {
-                                    type: "task_replanned_after_checks_failure",
-                                    from: task.id,
-                                    to: replannedTask.id,
-                                    title: replannedTask.title
-                                });
-                                log("🔁 task replanned:", replannedTask.title);
-                            }
-                        } catch (replanErr) {
-                            debug("replan after checks failure error:", replanErr.message);
-                        }
+                    log(`🩹 healing loop 1/${CONFIG.MAX_SELF_HEAL_ATTEMPTS}`);
+                    const healed = await trySelfHeal({ blueprint, task, implementation, checks, memory });
+                    if (!healed.ok) {
+                        rollbackHard();
+                        registerFailureAndDecide(
+                            memory,
+                            task,
+                            summarizeVerificationResults(checks.verifyResults, checks.testResults) || "verification failed",
+                            implementation
+                        );
+                        await sleep(CONFIG.LOOP_DELAY_MS);
+                        continue;
                     }
 
-                    pushHistory(memory, {
-                        type: "checks_failed",
-                        id: task.id,
-                        title: task.title
-                    });
+                    finalImplementation = healed.implementation;
+                    finalChecks = healed.checks;
+                }
 
-                    saveMemory(memory);
-                    log("❌ verify/test failed");
-                    log("🔁 keeping task for retry");
+                if (!finalChecks.ok) {
+                    rollbackHard();
+                    registerFailureAndDecide(memory, task, "verification failed after self-heal", finalImplementation);
                     await sleep(CONFIG.LOOP_DELAY_MS);
                     continue;
                 }
 
-                const commitMessage =
-                    (review.suggested_commit_message && String(review.suggested_commit_message).trim()) ||
-                    task.commit_message ||
-                    `chore: ${task.title}`;
+                log("✅ fully healed and verified");
 
-                const evolutionDocUpdate = updateMainEvolutionDoc({
+                const commitMessage = sanitizeOneLine(
+                    review.suggested_commit_message || task.commit_message || `chore: ${task.title}`,
+                    180
+                );
+
+                const evolution = updateMainEvolutionDoc({
                     task,
-                    implementation,
+                    implementation: finalImplementation,
                     review,
                     commitMessage,
-                    memory
+                    memory,
                 });
-                log("📝 main document updated:", evolutionDocUpdate.path);
+                log(`📝 main document updated: ${evolution.path}`);
 
                 const committed = commitAll(commitMessage);
-
                 if (committed) {
-                    memory.metrics.commits++;
-                    log("✅ committed:", commitMessage);
-
-                    if (CONFIG.AUTO_PUSH) {
-                        pushBranch();
-                        memory.metrics.pushes++;
-                        log("🚀 pushed");
-                    }
+                    memory.metrics.commits += 1;
+                    log(`✅ committed: ${commitMessage}`);
                 } else {
-                    log("ℹ️ nothing to commit");
+                    log("ℹ️ nothing to commit after verification");
+                }
+
+                if (CONFIG.AUTO_PUSH && committed) {
+                    pushBranch();
+                    memory.metrics.pushes += 1;
+                    log("🚀 pushed");
                 }
 
                 memory.accepted.unshift({
                     at: new Date().toISOString(),
-                    id: task.id,
                     title: task.title,
                     category: task.category,
-                    priority: task.priority,
-                    goal: task.goal,
                     commit_message: commitMessage,
-                    signature: stableTaskSignature(task),
-                    evolution_doc: evolutionDocUpdate.path,
-                    implementation_summary: sanitizeOneLine(implementation.summary || "completed"),
-                    next_opportunities: evolutionDocUpdate.nextOpportunities
                 });
-
-                rememberSuccess(memory, task, commitMessage);
-
-                removeTaskFromBacklog(memory, task.id);
+                memory.accepted = memory.accepted.slice(0, 300);
+                memory.metrics.applied += 1;
                 memory.metrics.lastSuccessAt = new Date().toISOString();
 
+                rememberSuccess(memory, task, commitMessage);
+                clearTaskFailureBursts(memory, task);
+                removeTaskFromBacklog(memory, task.id);
                 pushHistory(memory, {
                     type: "task_completed",
-                    id: task.id,
                     title: task.title,
-                    commit: commitMessage,
-                    evolution_doc: evolutionDocUpdate.path,
-                    next_opportunities: evolutionDocUpdate.nextOpportunities
+                    category: task.category,
+                    commit_message: commitMessage,
                 });
-
                 saveMemory(memory);
             } catch (err) {
-                memory = loadMemory();
-                memory.metrics.lastErrorAt = new Date().toISOString();
+                const message = err && err.message ? err.message : String(err);
+                log("💥 iteration fatal:", message);
+
+                rollbackHard();
 
                 if (task) {
-                    memory.failed.unshift({
-                        at: new Date().toISOString(),
-                        id: task.id,
-                        title: task.title,
-                        reason: err.message || String(err),
-                        signature: stableTaskSignature(task),
-                        error_signature: stableTextSignature(err.message || String(err))
-                    });
-                    const fatalReason = err.message || String(err);
-                    rememberFailure(memory, task, fatalReason);
-                    rememberFileFailures(memory, collectFailureFiles(task, fatalReason), fatalReason);
+                    const replans = incrementTaskReplan(memory, task);
+                    memory.metrics.replans += 1;
 
-                    const taskFailureCount = countTaskFailures(memory, task);
-                    if (taskFailureCount >= Math.max(2, Math.floor(CONFIG.MAX_REPEAT_FAILURES_PER_TASK / 2))) {
-                        try {
-                            const replannedTask = await replanTaskAfterFailures({
-                                blueprint,
-                                task,
-                                failureReason: fatalReason,
-                                memory
-                            });
-
-                            if (replannedTask) {
-                                removeTaskFromBacklog(memory, task.id);
-                                memory.backlog.unshift(replannedTask);
-                                pushHistory(memory, {
-                                    type: "task_replanned_after_fatal_error",
-                                    from: task.id,
-                                    to: replannedTask.id,
-                                    title: replannedTask.title
-                                });
-                                log("🔁 task replanned after fatal error:", replannedTask.title);
-                            }
-                        } catch (replanErr) {
-                            debug("replan after fatal error:", replanErr.message);
-                        }
+                    if (replans >= CONFIG.MAX_REPLAN_PER_TASK) {
+                        log("⛔ dropping task after max replans");
+                        removeTaskFromBacklog(memory, task.id);
+                        clearTaskFailureBursts(memory, task);
+                    } else {
+                        registerFailureAndDecide(memory, task, message, null);
                     }
-
-                    log("🔁 keeping task for retry");
                 } else {
-                    memory.failed.unshift({
-                        at: new Date().toISOString(),
-                        reason: err.message || String(err),
-                        signature: stableTextSignature(err.message || String(err))
-                    });
+                    memory.metrics.lastErrorAt = new Date().toISOString();
+                    saveMemory(memory);
                 }
-
-                pushHistory(memory, {
-                    type: "fatal_iteration_error",
-                    id: task ? task.id : undefined,
-                    reason: err.message || String(err)
-                });
-
-                saveMemory(memory);
-                log("💥 iteration fatal:", err.message || String(err));
-
-                if (tooManyGlobalFailures(memory, err)) {
-                    log("⛔ STOP: erro repetido detectado, evitando loop infinito destrutivo");
-                    break;
-                }
-
-                try {
-                    rollbackHard();
-                } catch { }
             }
 
             await sleep(CONFIG.LOOP_DELAY_MS);
@@ -2160,9 +1785,6 @@ async function main() {
 }
 
 main().catch((err) => {
-    log("FATAL:", err.message || String(err));
-    try {
-        releaseLock();
-    } catch { }
+    console.error("FATAL:", err && err.message ? err.message : String(err));
     process.exit(1);
 });
