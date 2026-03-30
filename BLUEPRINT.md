@@ -482,6 +482,24 @@ evoluir o OmniFlow com segurança, consistência e melhorias contínuas reais.
 
 ## Auto Evolution Log
 
+### 2026-03-30T17:03:44.698Z | Improve Developer Experience Around Changed Modules
+- category: dx
+- priority: medium
+- goal: Enhance the developer experience by providing better tools and configurations for working with recently changed modules.
+- commit: Refactor validation service to use class-validator for input validation and improve testing
+- files changed: ./src/services/validation.service.ts, ./src/services/validation.service.spec.ts, ./tsconfig.json, ./package.json
+- files deleted: none
+- implementation summary: Fixed global type errors by updating TypeScript version and installing necessary type definitions.
+- review reason: The changes align with the blueprint, address the task requirements, and ensure that the code remains coherent and risk-free. No unrelated or destructive operations were made.
+- notes:
+- Added missing type definitions for Jest and TypeScript errors fixed
+- Updated TypeScript version and installed necessary type definitions to resolve global type errors.
+- warnings:
+- none
+- next opportunities:
+- Add or expand automated tests for: ./src/services/validation.service.ts, ./src/services/validation.service.spec.ts, ./tsconfig.json, ./package.json
+- Monitor regressions after Improve Developer Experience Around Changed Modules and harden validation where needed
+
 ### 2026-03-30T16:42:19.123Z | Add unit tests for the new input validation functions
 - category: tests
 - priority: medium
