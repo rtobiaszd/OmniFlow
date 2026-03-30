@@ -14,6 +14,9 @@ const { spawnSync } = require("child_process");
 const CONFIG = {
     REPO_PATH: process.env.REPO_PATH || process.cwd(),
     BLUEPRINT_FILE: process.env.BLUEPRINT_FILE || "BLUEPRINT.md",
+    MAIN_EVOLUTION_DOC: process.env.MAIN_EVOLUTION_DOC || process.env.BLUEPRINT_FILE || "BLUEPRINT.md",
+    EVOLUTION_SECTION_TITLE: process.env.EVOLUTION_SECTION_TITLE || "## Auto Evolution Log",
+    MAX_EVOLUTION_ENTRIES: Number(process.env.MAX_EVOLUTION_ENTRIES || 200),
 
     OLLAMA_URL: process.env.OLLAMA_URL || "http://localhost:11434/api/generate",
     MODEL_PLANNER: process.env.MODEL_PLANNER || "qwen2.5-coder:7b",
@@ -188,6 +191,19 @@ function stripCodeFence(text) {
         .replace(/^```(?:json|javascript|js|txt)?\s*/i, "")
         .replace(/\s*```$/i, "")
         .trim();
+}
+
+function sanitizeOneLine(text, max = 220) {
+    return String(text || "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, max);
+}
+
+function listToBullets(items, fallback = "- none") {
+    const cleaned = unique((items || []).map((item) => sanitizeOneLine(item, 260)).filter(Boolean));
+    if (!cleaned.length) return fallback;
+    return cleaned.map((item) => `- ${item}`).join("\n");
 }
 
 function isIgnoredDir(name) {
@@ -592,6 +608,11 @@ function rollbackHard() {
         }
     }
 
+    const mainDoc = abs(CONFIG.MAIN_EVOLUTION_DOC);
+    if (exists(mainDoc)) {
+        backup.set(mainDoc, safeRead(mainDoc, ""));
+    }
+
     git("reset --hard", true);
     git("clean -fd", true);
 
@@ -862,6 +883,69 @@ function extractRelevantFilesFromErrors(text) {
     return unique(normalized);
 }
 
+function summarizeVerificationResults(verifyResults, testResults) {
+    return [
+        summarizeCommandFailures(verifyResults),
+        summarizeCommandFailures(testResults)
+    ].filter(Boolean).join("\n\n");
+}
+
+/* ========================= MAIN DOCUMENT EVOLUTION ========================= */
+
+function buildEvolutionEntry({ task, implementation, review, commitMessage }) {
+    const touchedFiles = implementation?.files?.map((file) => file.path) || [];
+    const deletedFiles = implementation?.delete_files || [];
+    const notes = implementation?.notes || [];
+    const warnings = review?.warnings || [];
+
+    return [
+        `### ${new Date().toISOString()} | ${sanitizeOneLine(task.title, 160)}`,
+        `- category: ${sanitizeOneLine(task.category, 40)}`,
+        `- priority: ${sanitizeOneLine(task.priority, 20)}`,
+        `- goal: ${sanitizeOneLine(task.goal, 300)}`,
+        `- commit: ${sanitizeOneLine(commitMessage || task.commit_message || "", 220)}`,
+        `- files changed: ${touchedFiles.length ? touchedFiles.join(", ") : "none"}`,
+        deletedFiles.length ? `- files deleted: ${deletedFiles.join(", ")}` : `- files deleted: none`,
+        `- implementation summary: ${sanitizeOneLine(implementation?.summary || "completed successfully", 320)}`,
+        `- review reason: ${sanitizeOneLine(review?.reason || "approved", 220)}`,
+        `- notes:\n${listToBullets(notes)}`,
+        `- warnings:\n${listToBullets(warnings)}`
+    ].join("\n");
+}
+
+function trimEvolutionEntries(entries) {
+    return entries.slice(0, CONFIG.MAX_EVOLUTION_ENTRIES);
+}
+
+function upsertEvolutionSection(originalContent, entry) {
+    const marker = CONFIG.EVOLUTION_SECTION_TITLE;
+    const text = String(originalContent || "").trimEnd();
+
+    if (!text.includes(marker)) {
+        return `${text}\n\n${marker}\n\n${entry}\n`;
+    }
+
+    const idx = text.indexOf(marker);
+    const before = text.slice(0, idx + marker.length).trimEnd();
+    const after = text.slice(idx + marker.length).trim();
+
+    const blocks = after
+        ? after.split(/\n(?=###\s)/g).map((chunk) => chunk.trim()).filter(Boolean)
+        : [];
+
+    const updated = trimEvolutionEntries([entry, ...blocks]).join("\n\n");
+    return `${before}\n\n${updated}\n`;
+}
+
+function updateMainEvolutionDoc({ task, implementation, review, commitMessage }) {
+    const target = abs(CONFIG.MAIN_EVOLUTION_DOC);
+    const previous = safeRead(target, "");
+    const entry = buildEvolutionEntry({ task, implementation, review, commitMessage });
+    const next = upsertEvolutionSection(previous, entry);
+    safeWrite(target, next);
+    return rel(target);
+}
+
 /* ========================= AI ========================= */
 
 async function askModel(model, prompt) {
@@ -933,6 +1017,7 @@ CRITICAL RULES:
 - Max ${CONFIG.MAX_FILES_PER_TASK} files per task
 - Always include real file paths when possible
 - Generate at least a mix of feature/product and hardening tasks
+- Consider previously completed tasks and the auto evolution log so the project keeps evolving instead of repeating itself
 
 CRITICAL OUTPUT RULES:
 - Return ONLY JSON
@@ -988,6 +1073,7 @@ CRITICAL IMPLEMENTATION RULES:
 - Existing files must be fully rewritten in output
 - New files only if task justifies it
 - Focus on delivering working code that passes lint, typecheck, build and tests
+- If verification fails later, the system will try to self-heal, so prefer root-cause fixes over superficial patches
 - NEVER modify or access protected files
 - Never introduce forbidden technologies
 
@@ -1091,6 +1177,7 @@ CRITICAL RULES:
 - Do not touch protected files
 - Prioritize actual delivery over partial changes
 - For TypeScript errors, fix the root typing issue, not just the symptom
+- If the first fix reveals a second error, continue fixing the new root cause
 
 CRITICAL OUTPUT RULES:
 - Return ONLY JSON
@@ -1270,6 +1357,7 @@ function pickNextTask(memory) {
 
     const candidates = backlog
         .filter((task) => !wasTaskSuccessful(memory, task))
+        .filter((task) => countTaskFailures(memory, task) < CONFIG.MAX_REPEAT_FAILURES_PER_TASK)
         .sort((a, b) => {
             const failDiff = countTaskFailures(memory, a) - countTaskFailures(memory, b);
             if (failDiff !== 0) return failDiff;
@@ -1495,11 +1583,7 @@ function runVerification(memory) {
 }
 
 async function trySelfHeal({ blueprint, task, implementation, checks, memory }) {
-    let failedSummary = [
-        summarizeCommandFailures(checks.verifyResults),
-        summarizeCommandFailures(checks.testResults)
-    ].filter(Boolean).join("\n\n");
-
+    let failedSummary = summarizeVerificationResults(checks.verifyResults, checks.testResults);
     let currentImpl = implementation;
     const commands = detectProjectCommands();
 
@@ -1526,7 +1610,8 @@ async function trySelfHeal({ blueprint, task, implementation, checks, memory }) 
                 "self-heal",
                 isValidImplementation
             );
-        } catch {
+        } catch (err) {
+            debug("self-heal parse error:", err.message);
             continue;
         }
 
@@ -1553,17 +1638,17 @@ async function trySelfHeal({ blueprint, task, implementation, checks, memory }) 
 
             if (newChecks.ok) {
                 memory.metrics.selfHealSuccess++;
-                return { ok: true, implementation: fixedImpl };
+                return {
+                    ok: true,
+                    implementation: fixedImpl,
+                    checks: newChecks
+                };
             }
 
-            failedSummary = [
-                summarizeCommandFailures(newChecks.verifyResults),
-                summarizeCommandFailures(newChecks.testResults)
-            ].filter(Boolean).join("\n\n");
-
+            failedSummary = summarizeVerificationResults(newChecks.verifyResults, newChecks.testResults) || failedSummary;
             currentImpl = fixedImpl;
-            restoreBackup(backups);
-            rollbackHard();
+
+            log("⚠️ self-heal applied but ainda há erros; continuando a correção");
         } catch (err) {
             debug("self-heal apply error:", err.message);
             restoreBackup(backups);
@@ -1596,6 +1681,7 @@ async function main() {
         log("🚀 AUTONOMOUS AGENT LEVEL 7 STARTED");
         log("📁 repo:", CONFIG.REPO_PATH);
         log("📘 blueprint:", CONFIG.BLUEPRINT_FILE);
+        log("📝 main evolution doc:", CONFIG.MAIN_EVOLUTION_DOC);
         log("🌿 branch:", branch);
 
         for (let i = 0; i < CONFIG.MAX_ITERATIONS; i++) {
@@ -1714,7 +1800,7 @@ async function main() {
 
                     currentImplementation = healed.implementation;
                     implementation = healed.implementation;
-                    checks = runVerification(memory);
+                    checks = healed.checks || runVerification(memory);
 
                     if (checks.ok) {
                         log("✅ fully healed and verified");
@@ -1757,6 +1843,14 @@ async function main() {
                     task.commit_message ||
                     `chore: ${task.title}`;
 
+                const evolutionDocPath = updateMainEvolutionDoc({
+                    task,
+                    implementation,
+                    review,
+                    commitMessage
+                });
+                log("📝 main document updated:", evolutionDocPath);
+
                 const committed = commitAll(commitMessage);
 
                 if (committed) {
@@ -1780,7 +1874,9 @@ async function main() {
                     priority: task.priority,
                     goal: task.goal,
                     commit_message: commitMessage,
-                    signature: stableTaskSignature(task)
+                    signature: stableTaskSignature(task),
+                    evolution_doc: evolutionDocPath,
+                    implementation_summary: sanitizeOneLine(implementation.summary || "completed")
                 });
 
                 rememberSuccess(memory, task, commitMessage);
@@ -1792,7 +1888,8 @@ async function main() {
                     type: "task_completed",
                     id: task.id,
                     title: task.title,
-                    commit: commitMessage
+                    commit: commitMessage,
+                    evolution_doc: evolutionDocPath
                 });
 
                 saveMemory(memory);
