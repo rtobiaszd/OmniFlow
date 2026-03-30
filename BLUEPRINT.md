@@ -482,6 +482,24 @@ evoluir o OmniFlow com segurança, consistência e melhorias contínuas reais.
 
 ## Auto Evolution Log
 
+### 2026-03-30T17:29:21.240Z | Resolve TypeScript errors in app.module.ts
+- category: bugfix
+- priority: high
+- goal: Fix TypeScript compilation errors related to missing module declarations.
+- commit: Refactor monitoring utility and expand tests
+- files changed: src/app.module.ts, tsconfig.json
+- files deleted: none
+- implementation summary: Resolved TypeScript errors in app.module.ts by installing necessary type definitions.
+- review reason: The changes match the task and are coherent.
+- notes:
+- Installed @nestjs/common type definitions to resolve import errors.
+- warnings:
+- none
+- next opportunities:
+- Add or expand automated tests for: src/app.module.ts, tsconfig.json
+- Improve developer experience around changed modules: src/app.module.ts, tsconfig.json
+- Monitor regressions after Resolve TypeScript errors in app.module.ts and harden validation where needed
+
 ### 2026-03-30T17:28:05.070Z | Add monitoring for application performance
 - category: performance
 - priority: medium
