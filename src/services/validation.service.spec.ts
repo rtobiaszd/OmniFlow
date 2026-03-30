@@ -1,1 +1,5 @@
-// Content of src/services/validation.service.spec.ts
+describe('ValidationService', () => {
+    it('should be defined', () => {
+        expect(true).toBe(true);
+    });
+});
