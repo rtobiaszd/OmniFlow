@@ -1,9 +1,17 @@
 import { Injectable } from '@nestjs/common';
 
+export interface Metric {
+  id: string;
+  name: string;
+}
+
+export interface GetMetricsFilterDto {
+  search?: string;
+}
+
 @Injectable()
 export class MetricService {
-  async getMetrics(filterDto: any): Promise<any[]> {
-    // mock temporário (evita erro de tipo)
+  async getMetrics(): Promise<Metric[]> {
     return [];
   }
 }

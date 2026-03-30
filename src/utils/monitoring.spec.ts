@@ -1,5 +1,5 @@
 // Updated monitoring to use NestJS testing utilities.
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import { AppModule } from '../app.module';
 import request from 'supertest';
