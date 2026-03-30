@@ -1,12 +1,13 @@
-// Updated tsconfig.json to include necessary type definitions
+
 {
   "compilerOptions": {
-    "target": "ES5",
+    "target": "es5",
     "module": "commonjs",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "lib": ["es6", "dom"]
-  }
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src"]
 }
+      
