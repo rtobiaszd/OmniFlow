@@ -1,6 +1,6 @@
-
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
+// Updated monitoring to use NestJS testing utilities.
+import { INestApplication } from '@nestjs/common';
+import { AppModule } from '../app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -9,6 +9,3 @@ async function bootstrap() {
   });
 }
 bootstrap();
-
-export default () => {};
-      
