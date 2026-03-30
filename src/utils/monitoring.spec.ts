@@ -1,20 +1,20 @@
-// Updated monitoring spec to use NestJS testing utilities.
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test } from '@nestjs/testing';
+import { INestApplication } from '@nestjs/common';
 import { AppModule } from '../app.module';
 
 describe('Monitoring', () => {
-  let module: TestingModule;
+  let app: INestApplication;
 
-  beforeEach(async () => {
-    module = await Test.createTestingModule({
+  beforeAll(async () => {
+    const module = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
+
+    app = module.createNestApplication();
+    await app.init();
   });
 
-  it('should start the application and listen on port 3000', async () => {
-    const app = module.get<INestApplication>(NestApplication);
-    await app.listen(3000);
-    console.log('Application is running on: http://localhost:3000');
-    await app.close();
+  it('should start', () => {
+    expect(app).toBeDefined();
   });
 });

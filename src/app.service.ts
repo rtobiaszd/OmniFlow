@@ -1,9 +1,9 @@
-// Updated to use optimized MetricService methods.
 import { Injectable } from '@nestjs/common';
+import { MetricService } from './services/metric.service';
 
 @Injectable()
-class AppService {
-  constructor(private readonly metricService: MetricService) {}
+export class AppService {
+  constructor(private readonly metricService: MetricService) { }
 
   async getMetrics(filterDto: any) {
     return this.metricService.getMetrics(filterDto);

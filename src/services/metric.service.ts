@@ -1,9 +1,9 @@
-// Optimized metric retrieval logic in MetricService.
 import { Injectable } from '@nestjs/common';
 
 @Injectable()
-class MetricService {
+export class MetricService {
   async getMetrics(filterDto: any): Promise<any[]> {
+    // mock temporário (evita erro de tipo)
     return [];
   }
 }
