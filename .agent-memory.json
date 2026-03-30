@@ -17,6 +17,14 @@
   "accepted": [],
   "failed": [
     {
+      "at": "2026-03-26T20:52:06.230Z",
+      "id": "task-4",
+      "title": "Add Unit Tests for Email Service Functions",
+      "reason": "Extensão não permitida: .env.example",
+      "signature": "14eca72c9979e4924330c39dc4cd98bcde2b11a7",
+      "error_signature": "8f846be0fa714f0db45673c57e438f3e54f6dfe9"
+    },
+    {
       "at": "2026-03-26T20:42:33.086Z",
       "id": "task-4",
       "title": "Add Unit Tests for Email Service Functions",
@@ -35,6 +43,12 @@
   ],
   "skipped": [],
   "history": [
+    {
+      "at": "2026-03-26T20:52:06.231Z",
+      "type": "fatal_iteration_error",
+      "id": "task-4",
+      "reason": "Extensão não permitida: .env.example"
+    },
     {
       "at": "2026-03-26T20:42:33.961Z",
       "type": "fatal_iteration_error",
@@ -66,12 +80,12 @@
     "testPatterns": []
   },
   "metrics": {
-    "iterations": 4,
+    "iterations": 6,
     "plannerRuns": 1,
-    "tasksExecuted": 4,
-    "approvals": 1,
+    "tasksExecuted": 6,
+    "approvals": 2,
     "rejections": 0,
-    "applied": 1,
+    "applied": 2,
     "commits": 0,
     "pushes": 0,
     "verifyPass": 0,
@@ -81,6 +95,6 @@
     "selfHealSuccess": 0,
     "selfHealFail": 0,
     "lastSuccessAt": null,
-    "lastErrorAt": "2026-03-26T20:42:33.086Z"
+    "lastErrorAt": "2026-03-26T20:52:06.230Z"
   }
 }

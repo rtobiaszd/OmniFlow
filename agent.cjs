@@ -8,7 +8,7 @@ const axios = require("axios");
 const { spawnSync } = require("child_process");
 
 /* =========================================================
- * AGENT LEVEL 6 - BLUEPRINT DRIVEN AUTONOMOUS ENGINEER
+ * AGENT LEVEL 7 - BLUEPRINT DRIVEN AUTONOMOUS ENGINEER
  * ========================================================= */
 
 const CONFIG = {
@@ -20,6 +20,7 @@ const CONFIG = {
     MODEL_EXECUTOR: process.env.MODEL_EXECUTOR || "qwen2.5-coder:7b",
     MODEL_REVIEWER: process.env.MODEL_REVIEWER || "qwen2.5-coder:7b",
     MODEL_FIXER: process.env.MODEL_FIXER || "qwen2.5-coder:7b",
+    MODEL_JSON_REPAIR: process.env.MODEL_JSON_REPAIR || process.env.MODEL_FIXER || "qwen2.5-coder:7b",
 
     REMOTE_NAME: process.env.REMOTE_NAME || "origin",
     AUTO_PUSH: String(process.env.AUTO_PUSH || "true").toLowerCase() === "true",
@@ -30,15 +31,16 @@ const CONFIG = {
     LOOP_DELAY_MS: Number(process.env.LOOP_DELAY_MS || 5000),
 
     MAX_FILES_PER_TASK: Number(process.env.MAX_FILES_PER_TASK || 12),
-    MAX_CONTEXT_FILES: Number(process.env.MAX_CONTEXT_FILES || 30),
-    MAX_FILE_CHARS: Number(process.env.MAX_FILE_CHARS || 18000),
-    MAX_BLUEPRINT_CHARS: Number(process.env.MAX_BLUEPRINT_CHARS || 40000),
+    MAX_CONTEXT_FILES: Number(process.env.MAX_CONTEXT_FILES || 40),
+    MAX_FILE_CHARS: Number(process.env.MAX_FILE_CHARS || 20000),
+    MAX_BLUEPRINT_CHARS: Number(process.env.MAX_BLUEPRINT_CHARS || 45000),
     MAX_BACKLOG_ITEMS: Number(process.env.MAX_BACKLOG_ITEMS || 20),
     MAX_HISTORY_ITEMS: Number(process.env.MAX_HISTORY_ITEMS || 500),
 
     MAX_REPEAT_FAILURES_PER_TASK: Number(process.env.MAX_REPEAT_FAILURES_PER_TASK || 8),
-    MAX_SELF_HEAL_ATTEMPTS: Number(process.env.MAX_SELF_HEAL_ATTEMPTS || 8),
-    MAX_PARSE_RETRIES: Number(process.env.MAX_PARSE_RETRIES || 3),
+    MAX_SELF_HEAL_ATTEMPTS: Number(process.env.MAX_SELF_HEAL_ATTEMPTS || 10),
+    MAX_PARSE_RETRIES: Number(process.env.MAX_PARSE_RETRIES || 4),
+    MAX_JSON_REPAIR_ATTEMPTS: Number(process.env.MAX_JSON_REPAIR_ATTEMPTS || 2),
 
     ALLOW_NEW_FILES: String(process.env.ALLOW_NEW_FILES || "true").toLowerCase() === "true",
     ALLOW_DELETE_FILES: String(process.env.ALLOW_DELETE_FILES || "false").toLowerCase() === "true",
@@ -71,7 +73,8 @@ const CONFIG = {
         "agent3.cjs",
         "agent4.cjs",
         "agent5.cjs",
-        "agent6.cjs"
+        "agent6.cjs",
+        "agent7.cjs"
     ],
 
     PROTECTED_FILES: [
@@ -83,6 +86,7 @@ const CONFIG = {
         "agent4.cjs",
         "agent5.cjs",
         "agent6.cjs",
+        "agent7.cjs",
         "BLUEPRINT.md"
     ],
 
@@ -250,98 +254,100 @@ function tooManyGlobalFailures(memory, err) {
     return count >= 5;
 }
 
-/* ========================= JSON PARSER ========================= */
+/* ========================= JSON / REPAIR ========================= */
 
 function sanitizeModelOutput(raw) {
     if (!raw) return "";
     let cleaned = stripCodeFence(raw).trim();
-
     cleaned = cleaned.replace(/^\uFEFF/, "");
-    cleaned = cleaned
-        .replace(/[“”]/g, '"')
-        .replace(/[‘’]/g, "'");
-
+    cleaned = cleaned.replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
     return cleaned;
 }
+
 function parseJsonSafe(raw) {
     if (!raw) return null;
 
     try {
-        // 1. limpa markdown
-        let cleaned = raw
-            .replace(/```json/g, "")
+        let cleaned = sanitizeModelOutput(raw)
+            .replace(/```json/gi, "")
             .replace(/```/g, "")
             .trim();
 
-        // 2. tenta direto
         try {
             return JSON.parse(cleaned);
         } catch { }
 
-        // 3. pega primeiro JSON válido
-        const match = cleaned.match(/\{[\s\S]*\}/);
+        const match = cleaned.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
         if (!match) return null;
 
         let candidate = match[0];
 
-        // 4. remove trailing commas
         candidate = candidate.replace(/,\s*([}\]])/g, "$1");
 
-        // 5. corrige strings com backticks
-        candidate = candidate.replace(/:\s*`([\s\S]*?)`/g, (_, c) => {
+        candidate = candidate.replace(/:\s*`([\s\S]*?)`(?=\s*[,}])/g, (_, c) => {
             return ": " + JSON.stringify(c);
         });
 
-        // 6. escapa quebras de linha
-        candidate = candidate.replace(/\n/g, "\\n");
+        try {
+            return JSON.parse(candidate);
+        } catch { }
 
-        // 7. tenta parse final
-        return JSON.parse(candidate);
-    } catch (err) {
-        console.log("❌ JSON inválido (debug):");
-        console.log(raw.slice(0, 1000));
+        return null;
+    } catch {
         return null;
     }
 }
-function parseJsonSafe(raw) {
-    if (!raw) return null;
 
-    try {
-        // 1. limpa markdown
-        let cleaned = raw
-            .replace(/```json/g, "")
-            .replace(/```/g, "")
-            .trim();
+async function repairJsonWithModel(model, raw, label) {
+    const prompt = `
+You are a JSON repair engine.
 
-        // 2. tenta direto
-        try {
-            return JSON.parse(cleaned);
-        } catch { }
+TASK:
+Repair the following broken JSON so it becomes directly parsable by JSON.parse.
 
-        // 3. pega primeiro JSON válido
-        const match = cleaned.match(/\{[\s\S]*\}/);
-        if (!match) return null;
+RULES:
+- Return ONLY valid JSON
+- No markdown
+- No explanation
+- Keep the original structure and intent
+- Escape all strings correctly
+- Preserve file contents exactly as much as possible
 
-        let candidate = match[0];
+BROKEN INPUT:
+${truncate(raw, 40000)}
+`.trim();
 
-        // 4. remove trailing commas
-        candidate = candidate.replace(/,\s*([}\]])/g, "$1");
+    const repairedRaw = await askModel(model, prompt);
+    const parsed = parseJsonSafe(repairedRaw);
 
-        // 5. corrige strings com backticks
-        candidate = candidate.replace(/:\s*`([\s\S]*?)`/g, (_, c) => {
-            return ": " + JSON.stringify(c);
-        });
-
-        // 6. escapa quebras de linha
-        candidate = candidate.replace(/\n/g, "\\n");
-
-        // 7. tenta parse final
-        return JSON.parse(candidate);
-    } catch (err) {
-        console.log("❌ JSON inválido (debug):");
-        console.log(raw.slice(0, 1000));
-        return null;
+    if (parsed) {
+        log(`🧩 JSON repaired for ${label}`);
+        return parsed;
     }
+
+    return null;
+}
+
+function isValidBacklog(backlog) {
+    return Boolean(backlog && typeof backlog === "object" && Array.isArray(backlog.tasks));
+}
+
+function isValidImplementation(impl) {
+    return Boolean(
+        impl &&
+        typeof impl === "object" &&
+        Array.isArray(impl.files) &&
+        impl.files.length > 0 &&
+        impl.files.every((f) => f && typeof f.path === "string" && typeof f.content === "string")
+    );
+}
+
+function isValidReview(review) {
+    return Boolean(
+        review &&
+        typeof review === "object" &&
+        typeof review.verdict === "string"
+    );
 }
 
 /* ========================= LOCK ========================= */
@@ -523,7 +529,7 @@ function run(command, options = {}) {
         shell: true,
         encoding: "utf8",
         stdio: "pipe",
-        maxBuffer: 1024 * 1024 * 80
+        maxBuffer: 1024 * 1024 * 100
     });
 
     return {
@@ -619,6 +625,8 @@ function ensureBranch() {
     return target;
 }
 
+/* ========================= STATUS / SCAN ========================= */
+
 function getStatusPorcelain() {
     const out = git("status --porcelain", true);
     return out ? out.split(/\r?\n/).filter(Boolean) : [];
@@ -641,8 +649,6 @@ function workingTreeDirty() {
 
     return false;
 }
-
-/* ========================= REPO SCAN ========================= */
 
 function walkFiles(dir, list = []) {
     let entries = [];
@@ -785,7 +791,7 @@ function collectFileContents(paths) {
         .join("\n\n");
 }
 
-/* ========================= PROJECT COMMANDS ========================= */
+/* ========================= COMMANDS ========================= */
 
 function detectProjectCommands() {
     const pkgPath = path.join(CONFIG.REPO_PATH, "package.json");
@@ -928,6 +934,12 @@ CRITICAL RULES:
 - Always include real file paths when possible
 - Generate at least a mix of feature/product and hardening tasks
 
+CRITICAL OUTPUT RULES:
+- Return ONLY JSON
+- No markdown
+- No code fences
+- No explanation before or after JSON
+
 Return ONLY valid JSON in this exact shape:
 {
   "summary": "short summary of repo direction",
@@ -975,21 +987,18 @@ CRITICAL IMPLEMENTATION RULES:
 - Use exact relative repo paths
 - Existing files must be fully rewritten in output
 - New files only if task justifies it
-- Output MUST be valid JSON
-- Do not use markdown fences inside the JSON syntax
-- CRITICAL: File content must be a valid JSON string. ALL internal double quotes must be escaped as \\\"
-- You MAY use Javascript backticks (\`...\`) around the file content instead of double quotes to avoid escaping issues
-- NEVER modify or access these files:
-  - agent3.cjs
-  - agent4.cjs
-  - agent5.cjs
-  - agent6.cjs
-  - .agent-memory.json
-  - .agent-lock
-  - BLUEPRINT.md
-- Never introduce these technologies unless already present in the codebase:
-  - ${CONFIG.FORBIDDEN_TECH_KEYWORDS.join("\n  - ")}
 - Focus on delivering working code that passes lint, typecheck, build and tests
+- NEVER modify or access protected files
+- Never introduce forbidden technologies
+
+CRITICAL OUTPUT RULES:
+- Output MUST be valid JSON
+- Do not use markdown fences
+- Do not include explanations
+- Return ONLY JSON
+- All strings must be properly escaped
+- If file content contains quotes/newlines, escape them correctly
+- You MAY use backticks around file content value if needed, but final output must still be valid JSON or easily repairable
 
 Return ONLY valid JSON in this exact shape:
 {
@@ -1035,6 +1044,11 @@ Approve only if:
 - no protected files are touched
 - no new frameworks outside current stack
 
+CRITICAL OUTPUT RULES:
+- Return ONLY JSON
+- No markdown
+- No explanation
+
 Return ONLY valid JSON:
 {
   "verdict": "APPROVED|REJECTED",
@@ -1078,6 +1092,12 @@ CRITICAL RULES:
 - Prioritize actual delivery over partial changes
 - For TypeScript errors, fix the root typing issue, not just the symptom
 
+CRITICAL OUTPUT RULES:
+- Return ONLY JSON
+- No markdown
+- No explanation
+- All strings must be escaped correctly
+
 RETURN ONLY VALID JSON:
 {
   "summary": "what was fixed",
@@ -1094,7 +1114,7 @@ RETURN ONLY VALID JSON:
 `.trim();
 }
 
-/* ========================= TASK / PLAN VALIDATION ========================= */
+/* ========================= VALIDATION ========================= */
 
 function detectForbiddenKeywordsInTask(task) {
     const serialized = JSON.stringify(task).toLowerCase();
@@ -1244,10 +1264,6 @@ function wasTaskSuccessful(memory, task) {
     return memory.learned.successfulTaskSignatures.includes(signature);
 }
 
-function wasTaskFailedTooMuch(memory, task) {
-    return countTaskFailures(memory, task) >= CONFIG.MAX_REPEAT_FAILURES_PER_TASK;
-}
-
 function pickNextTask(memory) {
     const backlog = Array.isArray(memory.backlog) ? memory.backlog : [];
     if (!backlog.length) return null;
@@ -1354,15 +1370,39 @@ function ensureSafeStart() {
 
 /* ========================= CORE AI STEPS ========================= */
 
-async function askAndParseJson(model, prompt, label) {
+async function askAndParseJson(model, prompt, label, validator = null) {
     let lastRaw = "";
+
     for (let i = 1; i <= CONFIG.MAX_PARSE_RETRIES; i++) {
         lastRaw = await askModel(model, prompt);
-        const parsed = parseJsonSafe(lastRaw);
-        if (parsed) return parsed;
+
+        let parsed = parseJsonSafe(lastRaw);
+
+        if (!parsed) {
+            for (let j = 1; j <= CONFIG.MAX_JSON_REPAIR_ATTEMPTS; j++) {
+                parsed = await repairJsonWithModel(CONFIG.MODEL_JSON_REPAIR, lastRaw, label);
+                if (parsed) break;
+            }
+        }
+
+        if (parsed && (!validator || validator(parsed))) {
+            return parsed;
+        }
+
         log(`⚠️ falha ao parsear ${label}, tentativa ${i}/${CONFIG.MAX_PARSE_RETRIES}`);
+
+        prompt += `
+
+IMPORTANT:
+Return ONLY valid JSON.
+Do not use markdown.
+Do not include explanations.
+Ensure all strings are properly escaped.
+The response must be directly parsable by JSON.parse.
+`;
     }
-    throw new Error(`Falha ao parsear ${label}.\nRAW:\n${lastRaw}`);
+
+    throw new Error(`Falha ao parsear ${label}.\nRAW:\n${truncate(lastRaw, 8000)}`);
 }
 
 async function generateBacklog(memory, blueprint, repoIndex) {
@@ -1374,17 +1414,16 @@ async function generateBacklog(memory, blueprint, repoIndex) {
         branch: currentBranch()
     });
 
-    const parsed = await askAndParseJson(CONFIG.MODEL_PLANNER, prompt, "backlog do planner");
+    const parsed = await askAndParseJson(
+        CONFIG.MODEL_PLANNER,
+        prompt,
+        "backlog do planner",
+        isValidBacklog
+    );
+
     return validateBacklog(parsed, repoIndex, memory);
 }
-function isValidImplementation(impl) {
-    return (
-        impl &&
-        Array.isArray(impl.files) &&
-        impl.files.length > 0 &&
-        impl.files.every(f => f.path && f.content)
-    );
-}
+
 async function generateImplementation(task, blueprint, memory) {
     const fileContexts = collectContextsForTask(task);
     const commands = detectProjectCommands();
@@ -1397,11 +1436,17 @@ async function generateImplementation(task, blueprint, memory) {
         memory
     });
 
-    const impl = await askAndParseJson(CONFIG.MODEL_EXECUTOR, prompt, "implementação");
+    const impl = await askAndParseJson(
+        CONFIG.MODEL_EXECUTOR,
+        prompt,
+        "implementação",
+        isValidImplementation
+    );
 
     if (!isValidImplementation(impl)) {
         throw new Error("INVALID_IMPLEMENTATION_STRUCTURE");
     }
+
     validateImplementation(impl, task);
 
     if (containsDangerousContent(impl)) {
@@ -1419,7 +1464,12 @@ async function reviewImplementation(task, blueprint, implementation) {
         diff: diffWorkingTree()
     });
 
-    return askAndParseJson(CONFIG.MODEL_REVIEWER, prompt, "review");
+    return askAndParseJson(
+        CONFIG.MODEL_REVIEWER,
+        prompt,
+        "review",
+        isValidReview
+    );
 }
 
 function runVerification(memory) {
@@ -1470,8 +1520,17 @@ async function trySelfHeal({ blueprint, task, implementation, checks, memory }) 
 
         let fixedImpl;
         try {
-            fixedImpl = await askAndParseJson(CONFIG.MODEL_FIXER, prompt, "self-heal");
+            fixedImpl = await askAndParseJson(
+                CONFIG.MODEL_FIXER,
+                prompt,
+                "self-heal",
+                isValidImplementation
+            );
         } catch {
+            continue;
+        }
+
+        if (!isValidImplementation(fixedImpl)) {
             continue;
         }
 
@@ -1534,7 +1593,7 @@ async function main() {
 
         const branch = ensureBranch();
 
-        log("🚀 AUTONOMOUS AGENT LEVEL 6 STARTED");
+        log("🚀 AUTONOMOUS AGENT LEVEL 7 STARTED");
         log("📁 repo:", CONFIG.REPO_PATH);
         log("📘 blueprint:", CONFIG.BLUEPRINT_FILE);
         log("🌿 branch:", branch);
@@ -1639,7 +1698,6 @@ async function main() {
 
                 while (!checks.ok && healAttempts < CONFIG.MAX_SELF_HEAL_ATTEMPTS) {
                     healAttempts++;
-
                     log(`🩹 healing loop ${healAttempts}/${CONFIG.MAX_SELF_HEAL_ATTEMPTS}`);
 
                     const healed = await trySelfHeal({
