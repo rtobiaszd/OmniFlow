@@ -1,6 +1,6 @@
 {
-  "repoHash": "27c339d933a65efbe540b21a9aee5d11c8df3778",
-  "blueprintHash": "d36bb1d489c2957bbf4397b6d6b9746055fb7813",
+  "repoHash": "10281da6ad59951535ce0348b0821e97e98babb4",
+  "blueprintHash": "79f21553aedad13c2ab43ad3f26dfb82ecfdbd71",
   "backlog": [
     {
       "id": "1",
@@ -96,6 +96,46 @@
     }
   ],
   "failed": [
+    {
+      "at": "2026-03-30T18:22:30.414Z",
+      "title": "Add unit tests for src/app.module.ts",
+      "category": "tests",
+      "reason": "review rejected: The implementation does not match the task requirements. The task asks for unit tests for the monitoring utility, but the provided changes update the test file without creating any new tests.",
+      "signature": "888cb0016b6dbb78623fcc4c52b642e9535afdea",
+      "error_signature": "e97a36830bf515d49c0d91bf132d98259ad54836"
+    },
+    {
+      "at": "2026-03-30T18:21:42.601Z",
+      "title": "Refactor monitoring utility to improve readability",
+      "category": "refactor",
+      "reason": "review rejected: The implementation does not match the task requirements. The task asks for unit tests for the monitoring utility, but the provided changes update the test file without creating any new tests.",
+      "signature": "2a1321b07680131399802df6e1d2241fff3a5771",
+      "error_signature": "e97a36830bf515d49c0d91bf132d98259ad54836"
+    },
+    {
+      "at": "2026-03-30T18:20:50.493Z",
+      "title": "Add integration tests for caching mechanism",
+      "category": "tests",
+      "reason": "review rejected: The task requires adding unit tests for src/app.module.ts, but the implementation only updates the test file without creating any new tests.",
+      "signature": "33adf0b2ade8adfa37ec336ba90d0a351a812474",
+      "error_signature": "0e0c118379c3e196a18be09dacc54bd1a628a6ce"
+    },
+    {
+      "at": "2026-03-30T18:19:48.691Z",
+      "title": "Refactor monitoring utility to improve readability",
+      "category": "refactor",
+      "reason": "review rejected: The task requires adding unit tests for src/app.module.ts, but the implementation only updates the test file without creating any new tests.",
+      "signature": "2a1321b07680131399802df6e1d2241fff3a5771",
+      "error_signature": "0e0c118379c3e196a18be09dacc54bd1a628a6ce"
+    },
+    {
+      "at": "2026-03-30T18:18:47.272Z",
+      "title": "Add unit tests for src/app.module.ts",
+      "category": "tests",
+      "reason": "final review rejected: The task requires adding unit tests for src/app.module.ts, but the implementation only updates the file without addressing any specific test cases. This does not meet the requirement of ensuring the application module is robust and free of bugs.",
+      "signature": "888cb0016b6dbb78623fcc4c52b642e9535afdea",
+      "error_signature": "14fc0effb0d8205b307cf28c3c6638e4235456a8"
+    },
     {
       "at": "2026-03-30T17:39:11.895Z",
       "title": "Add integration tests for caching mechanism",
@@ -307,7 +347,12 @@
     }
   ],
   "identicalFailureBursts": {
-    "33adf0b2ade8adfa37ec336ba90d0a351a812474:8128e6a20d22c4c41ecdf5a0f17587a27e97cd15": 1
+    "33adf0b2ade8adfa37ec336ba90d0a351a812474:8128e6a20d22c4c41ecdf5a0f17587a27e97cd15": 1,
+    "888cb0016b6dbb78623fcc4c52b642e9535afdea:14fc0effb0d8205b307cf28c3c6638e4235456a8": 1,
+    "2a1321b07680131399802df6e1d2241fff3a5771:0e0c118379c3e196a18be09dacc54bd1a628a6ce": 1,
+    "33adf0b2ade8adfa37ec336ba90d0a351a812474:0e0c118379c3e196a18be09dacc54bd1a628a6ce": 1,
+    "2a1321b07680131399802df6e1d2241fff3a5771:e97a36830bf515d49c0d91bf132d98259ad54836": 1,
+    "888cb0016b6dbb78623fcc4c52b642e9535afdea:e97a36830bf515d49c0d91bf132d98259ad54836": 1
   },
   "learned": {
     "successfulTaskSignatures": [
@@ -320,6 +365,8 @@
       "291fbb53b23200734da75ff3756571320fb548ec"
     ],
     "failedTaskSignatures": [
+      "2a1321b07680131399802df6e1d2241fff3a5771",
+      "888cb0016b6dbb78623fcc4c52b642e9535afdea",
       "33adf0b2ade8adfa37ec336ba90d0a351a812474",
       "ec3da6abe064c745457fc8d162f37e1fe1cf5f98",
       "e145b8a564feaf17e01a622c0206d89dc2bb04ea",
@@ -342,18 +389,33 @@
     ],
     "buildPatterns": [],
     "testPatterns": [
+      "review rejected: The implementation does not match the task requirements. The task asks for unit tests for the monitoring utility, but the provided changes update the test file without creating any new tests.",
+      "review rejected: The implementation does not match the task requirements. The task asks for unit tests for the monitoring utility, but the provided changes update the test file without creating any new tests.",
+      "review rejected: The task requires adding unit tests for src/app.module.ts, but the implementation only updates the test file without creating any new tests.",
+      "review rejected: The task requires adding unit tests for src/app.module.ts, but the implementation only updates the test file without creating any new tests.",
+      "final review rejected: The task requires adding unit tests for src/app.module.ts, but the implementation only updates the file without addressing any specific test cases. This does not meet the requirement of ensuring the application module is robust and free of bugs.",
       "review rejected: The task title and implementation do not match. The task asks for unit tests for the monitoring utility, but the implementation only updates the test file without creating any new tests."
     ],
     "fileFailureStats": {
       "src/app.module.ts": {
-        "count": 2,
-        "lastReason": "COMMAND: npm run lint STDOUT: > react-example@0.0.0 lint > eslint --ext .js,.ts src/**/* STDERR: Oops! Something went wrong! :( ESLint: 8.57.0 ESLint couldn't find a configuration file. To set up a configuration file for",
-        "lastAt": "2026-03-30T17:26:55.734Z"
+        "count": 6,
+        "lastReason": "review rejected: The implementation does not match the task requirements. The task asks for unit tests for the monitoring utility, but the provided changes update the test file without creating any new tests.",
+        "lastAt": "2026-03-30T18:22:30.414Z"
+      },
+      "src/utils/monitoring.spec.ts": {
+        "count": 3,
+        "lastReason": "review rejected: The implementation does not match the task requirements. The task asks for unit tests for the monitoring utility, but the provided changes update the test file without creating any new tests.",
+        "lastAt": "2026-03-30T18:21:42.601Z"
       },
       "src/services/cache.service.spec.ts": {
         "count": 2,
         "lastReason": "COMMAND: npm run lint STDOUT: > react-example@0.0.0 lint > eslint src/**/* STDERR: Oops! Something went wrong! :( ESLint: 8.57.0 ESLint couldn't find a configuration file. To set up a configuration file for this project,",
         "lastAt": "2026-03-30T17:39:11.896Z"
+      },
+      "src/utils/monitoring.ts": {
+        "count": 2,
+        "lastReason": "review rejected: The implementation does not match the task requirements. The task asks for unit tests for the monitoring utility, but the provided changes update the test file without creating any new tests.",
+        "lastAt": "2026-03-30T18:21:42.601Z"
       },
       "src/services/cache.service.ts": {
         "count": 1,
@@ -395,10 +457,15 @@
         "lastReason": "COMMAND: npm run lint STDOUT: > react-example@0.0.0 lint > eslint --ext .js,.ts src/**/* STDERR: Oops! Something went wrong! :( ESLint: 8.57.0 ESLint couldn't find a configuration file. To set up a configuration file for",
         "lastAt": "2026-03-30T17:26:55.734Z"
       },
-      "src/utils/monitoring.spec.ts": {
+      "src/tests/integration/cache.test.ts": {
         "count": 1,
-        "lastReason": "review rejected: The task title and implementation do not match. The task asks for unit tests for the monitoring utility, but the implementation only updates the test file without creating any new tests.",
-        "lastAt": "2026-03-30T17:28:38.672Z"
+        "lastReason": "review rejected: The task requires adding unit tests for src/app.module.ts, but the implementation only updates the test file without creating any new tests.",
+        "lastAt": "2026-03-30T18:20:50.494Z"
+      },
+      "src/app.module.spec.ts": {
+        "count": 1,
+        "lastReason": "review rejected: The implementation does not match the task requirements. The task asks for unit tests for the monitoring utility, but the provided changes update the test file without creating any new tests.",
+        "lastAt": "2026-03-30T18:22:30.415Z"
       }
     },
     "taskReplanStats": {},
@@ -421,26 +488,30 @@
       "Monitor regressions after Improve Developer Experience Around Changed Modules and harden validation where needed",
       "Improve developer experience around changed modules: ./src/services/validation.service.ts, ./src/services/validation.service.spec.ts, ./tsconfig.json, tsconfig.json, package.json, src/services/validation.service.spec.ts",
       "Monitor regressions after Add unit tests for the new input validation functions and harden validation where needed"
-    ]
+    ],
+    "dependencyInstallPatterns": []
   },
   "metrics": {
-    "iterations": 21,
+    "iterations": 27,
     "plannerRuns": 6,
-    "tasksExecuted": 19,
-    "approvals": 10,
-    "rejections": 1,
+    "tasksExecuted": 25,
+    "approvals": 11,
+    "rejections": 6,
     "applied": 7,
     "commits": 7,
     "pushes": 7,
-    "verifyPass": 7,
+    "verifyPass": 15,
     "verifyFail": 27,
-    "testPass": 27,
-    "testFail": 7,
-    "selfHealSuccess": 4,
+    "testPass": 34,
+    "testFail": 8,
+    "selfHealSuccess": 5,
     "selfHealFail": 3,
     "replans": 0,
     "blueprintUpdates": 7,
+    "installs": 0,
+    "installSuccess": 0,
+    "installFail": 0,
     "lastSuccessAt": "2026-03-30T17:31:46.281Z",
-    "lastErrorAt": "2026-03-30T17:39:11.896Z"
+    "lastErrorAt": "2026-03-30T18:22:30.414Z"
   }
 }
