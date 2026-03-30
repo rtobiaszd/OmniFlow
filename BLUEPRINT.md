@@ -482,6 +482,24 @@ evoluir o OmniFlow com segurança, consistência e melhorias contínuas reais.
 
 ## Auto Evolution Log
 
+### 2026-03-30T17:28:05.070Z | Add monitoring for application performance
+- category: performance
+- priority: medium
+- goal: Implement basic monitoring to track key performance indicators.
+- commit: Refactor monitoring utilities to use NestJS testing utilities
+- files changed: src/utils/monitoring.ts, src/utils/monitoring.spec.ts
+- files deleted: none
+- implementation summary: Added monitoring functionality for application performance using NestJS testing utilities.
+- review reason: The changes align with the task and improve developer experience around changed modules. No obvious breakage or risk identified.
+- notes:
+- Updated monitoring to use NestJS testing utilities.
+- warnings:
+- none
+- next opportunities:
+- Add or expand automated tests for: src/utils/monitoring.ts, src/utils/monitoring.spec.ts
+- Improve developer experience around changed modules: src/utils/monitoring.ts, src/utils/monitoring.spec.ts
+- Monitor regressions after Add monitoring for application performance and harden validation where needed
+
 ### 2026-03-30T17:20:31.105Z | Optimize Application Performance
 - category: performance
 - priority: high
