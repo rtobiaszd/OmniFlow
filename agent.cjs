@@ -49,6 +49,15 @@ const CONFIG = {
     MAX_JSON_REPAIR_ATTEMPTS: Number(process.env.MAX_JSON_REPAIR_ATTEMPTS || 2),
     MAX_IDENTICAL_ERROR_RETRIES: Number(process.env.MAX_IDENTICAL_ERROR_RETRIES || 2),
 
+    AUTO_INSTALL_MISSING_PACKAGES:
+        String(process.env.AUTO_INSTALL_MISSING_PACKAGES || "true").toLowerCase() === "true",
+    ALLOW_DEV_DEP_INSTALLS:
+        String(process.env.ALLOW_DEV_DEP_INSTALLS || "true").toLowerCase() === "true",
+    MAX_AUTO_INSTALLS_PER_ITERATION: Number(process.env.MAX_AUTO_INSTALLS_PER_ITERATION || 3),
+    NPM_CLIENT: process.env.NPM_CLIENT || "",
+    REPO_STABILIZATION_MODE:
+        String(process.env.REPO_STABILIZATION_MODE || "true").toLowerCase() === "true",
+
     ALLOW_NEW_FILES: String(process.env.ALLOW_NEW_FILES || "true").toLowerCase() === "true",
     ALLOW_DELETE_FILES: String(process.env.ALLOW_DELETE_FILES || "false").toLowerCase() === "true",
     STRICT_CLEAN_START: String(process.env.STRICT_CLEAN_START || "true").toLowerCase() === "true",
@@ -121,6 +130,9 @@ const CONFIG = {
         ".prettierrc",
         ".prettierrc.js",
         ".prettierrc.cjs",
+        "eslint.config.js",
+        "eslint.config.cjs",
+        "eslint.config.mjs",
     ],
 
     ALLOWED_EXTENSIONS: [
@@ -222,7 +234,7 @@ function truncate(text, max) {
 }
 
 function unique(arr) {
-    return [...new Set(arr.filter(Boolean))];
+    return [...new Set((arr || []).filter(Boolean))];
 }
 
 function stripCodeFence(text) {
@@ -458,6 +470,7 @@ function createMemory() {
             fileFailureStats: {},
             taskReplanStats: {},
             nextOpportunityPatterns: [],
+            dependencyInstallPatterns: [],
         },
         metrics: {
             iterations: 0,
@@ -476,6 +489,9 @@ function createMemory() {
             selfHealFail: 0,
             replans: 0,
             blueprintUpdates: 0,
+            installs: 0,
+            installSuccess: 0,
+            installFail: 0,
             lastSuccessAt: null,
             lastErrorAt: null,
         },
@@ -526,6 +542,9 @@ function sanitizeMemory(raw) {
                     : {},
             nextOpportunityPatterns: Array.isArray(m?.learned?.nextOpportunityPatterns)
                 ? m.learned.nextOpportunityPatterns
+                : [],
+            dependencyInstallPatterns: Array.isArray(m?.learned?.dependencyInstallPatterns)
+                ? m.learned.dependencyInstallPatterns
                 : [],
         },
         metrics: {
@@ -589,6 +608,14 @@ function rememberFailure(memory, task, reason) {
         memory.learned.testPatterns.unshift(reason);
         memory.learned.testPatterns = memory.learned.testPatterns.slice(0, 50);
     }
+}
+
+function rememberInstalledPackages(memory, packages, reason) {
+    const items = unique((packages || []).map((pkg) => `${pkg} :: ${sanitizeOneLine(reason || "", 180)}`));
+    memory.learned.dependencyInstallPatterns = unique([
+        ...items,
+        ...(memory.learned.dependencyInstallPatterns || []),
+    ]).slice(0, 100);
 }
 
 function rememberNextOpportunities(memory, opportunities) {
@@ -814,6 +841,12 @@ function buildRepoIndex() {
         "docker-compose.yml",
         "docker-compose.yaml",
         "prisma/schema.prisma",
+        "eslint.config.js",
+        "eslint.config.cjs",
+        "eslint.config.mjs",
+        ".eslintrc",
+        ".eslintrc.js",
+        ".eslintrc.cjs",
     ];
 
     const importantFiles = [];
@@ -861,34 +894,41 @@ function loadBlueprint() {
     };
 }
 
-function buildRepoSnapshot(index) {
+function readPackageJsonSafe() {
     const packageJsonPath = path.join(CONFIG.REPO_PATH, "package.json");
+    if (!exists(packageJsonPath)) return null;
+    try {
+        return JSON.parse(safeRead(packageJsonPath, "{}"));
+    } catch {
+        return null;
+    }
+}
+
+function buildRepoSnapshot(index) {
+    const pkg = readPackageJsonSafe();
     let packageSummary = "package.json não encontrado";
     let dependencySummary = [];
 
-    if (exists(packageJsonPath)) {
-        try {
-            const pkg = JSON.parse(safeRead(packageJsonPath, "{}"));
-            dependencySummary = [
-                ...Object.keys(pkg.dependencies || {}),
-                ...Object.keys(pkg.devDependencies || {}),
-            ];
+    if (pkg) {
+        dependencySummary = [
+            ...Object.keys(pkg.dependencies || {}),
+            ...Object.keys(pkg.devDependencies || {}),
+        ];
 
-            packageSummary = JSON.stringify(
-                {
-                    name: pkg.name || null,
-                    version: pkg.version || null,
-                    type: pkg.type || null,
-                    scripts: pkg.scripts || {},
-                    dependencies: Object.keys(pkg.dependencies || {}).slice(0, 100),
-                    devDependencies: Object.keys(pkg.devDependencies || {}).slice(0, 100),
-                },
-                null,
-                2
-            );
-        } catch {
-            packageSummary = truncate(safeRead(packageJsonPath, ""));
-        }
+        packageSummary = JSON.stringify(
+            {
+                name: pkg.name || null,
+                version: pkg.version || null,
+                type: pkg.type || null,
+                scripts: pkg.scripts || {},
+                dependencies: Object.keys(pkg.dependencies || {}).slice(0, 100),
+                devDependencies: Object.keys(pkg.devDependencies || {}).slice(0, 100),
+            },
+            null,
+            2
+        );
+    } else if (exists(path.join(CONFIG.REPO_PATH, "package.json"))) {
+        packageSummary = truncate(safeRead(path.join(CONFIG.REPO_PATH, "package.json"), ""));
     }
 
     const fileContexts = index.importantFiles.map((f) => readFileContext(f)).join("\n\n");
@@ -917,27 +957,40 @@ function collectFileContents(paths) {
         .join("\n\n");
 }
 
+function detectPackageManager() {
+    if (CONFIG.NPM_CLIENT) return CONFIG.NPM_CLIENT;
+    if (exists(abs("pnpm-lock.yaml"))) return "pnpm";
+    if (exists(abs("yarn.lock"))) return "yarn";
+    if (exists(abs("package-lock.json"))) return "npm";
+    return "npm";
+}
+
+function runScript(scriptName) {
+    const manager = detectPackageManager();
+    if (manager === "pnpm") return `pnpm ${scriptName}`;
+    if (manager === "yarn") return `yarn ${scriptName}`;
+    return `npm run ${scriptName}`;
+}
+
 function detectProjectCommands() {
-    const pkgPath = path.join(CONFIG.REPO_PATH, "package.json");
+    const pkg = readPackageJsonSafe();
     const result = { verify: [], test: [] };
-    if (!exists(pkgPath)) return result;
+    if (!pkg) return result;
 
-    try {
-        const pkg = JSON.parse(safeRead(pkgPath, "{}"));
-        const scripts = pkg.scripts || {};
+    const scripts = pkg.scripts || {};
 
-        if (scripts.lint) result.verify.push("npm run lint");
-        if (scripts.typecheck) result.verify.push("npm run typecheck");
-        if (scripts.build) result.verify.push("npm run build");
+    if (scripts.lint) result.verify.push(runScript("lint"));
+    if (scripts.typecheck) result.verify.push(runScript("typecheck"));
+    if (scripts.build) result.verify.push(runScript("build"));
 
-        if (scripts.test) result.test.push("npm test");
-        if (scripts["test:unit"]) result.test.push("npm run test:unit");
-        if (scripts["test:integration"]) result.test.push("npm run test:integration");
-
-        return result;
-    } catch {
-        return result;
+    if (scripts.test) {
+        const manager = detectPackageManager();
+        result.test.push(manager === "yarn" ? "yarn test" : manager === "pnpm" ? "pnpm test" : "npm test");
     }
+    if (scripts["test:unit"]) result.test.push(runScript("test:unit"));
+    if (scripts["test:integration"]) result.test.push(runScript("test:integration"));
+
+    return result;
 }
 
 function runCommands(commands, label) {
@@ -972,7 +1025,7 @@ function summarizeCommandFailures(results) {
 function extractRelevantFilesFromErrors(text) {
     if (!text) return [];
     const matches =
-        String(text).match(/[A-Za-z0-9_./\\-]+\.(tsx|ts|jsx|js|json|css|scss|md|yml|yaml)/g) || [];
+        String(text).match(/[A-Za-z0-9_./\\-]+\.(tsx|ts|jsx|js|json|css|scss|md|yml|yaml|mjs|cjs)/g) || [];
     const normalized = matches.map(normalizeSlashes).filter((p) => !isProtectedFile(p));
     return unique(normalized);
 }
@@ -1090,19 +1143,19 @@ function updateMainEvolutionDoc({ task, implementation, review, commitMessage, m
 }
 
 function buildBacklogPlannerPrompt({ blueprint, snapshot, memory, branch }) {
-    return `You are an autonomous principal software engineer evolving a real production system.\n\nSOURCE OF TRUTH:\nThe blueprint below defines the product, architecture, goals, and constraints.\nYou must obey it strictly.\n\nBLUEPRINT:\n${blueprint.content}\n\nCURRENT BRANCH:\n${branch}\n\nPACKAGE SUMMARY:\n${snapshot.packageSummary}\n\nKNOWN FILES:\n${snapshot.fileList}\n\nIMPORTANT FILE EXCERPTS:\n${snapshot.fileContexts}\n\nMAIN EVOLUTION DOCUMENT EXCERPT:\n${snapshot.evolutionDocSummary || "(empty)"}\n\nKNOWN DEPENDENCIES:\n${JSON.stringify(snapshot.dependencySummary.slice(0, 120), null, 2)}\n\nLEARNED SUCCESSES:\n${JSON.stringify(memory.accepted.slice(0, 10), null, 2)}\n\nLEARNED FAILURES:\n${JSON.stringify(memory.failed.slice(0, 10), null, 2)}\n\nPREVIOUS SUCCESSFUL TASK SIGNATURES:\n${JSON.stringify(memory.learned.successfulTaskSignatures.slice(0, 20), null, 2)}\n\nPREVIOUS FAILED TASK SIGNATURES:\n${JSON.stringify(memory.learned.failedTaskSignatures.slice(0, 20), null, 2)}\n\nHOT FILES WITH RECENT FAILURES:\n${JSON.stringify(getHotFiles(memory), null, 2)}\n\nLEARNED NEXT OPPORTUNITIES:\n${JSON.stringify((memory.learned.nextOpportunityPatterns || []).slice(0, 20), null, 2)}\n\nCRITICAL RULES:\n- Read the blueprint and continuously create useful tasks forever\n- Generate tasks in these categories whenever relevant: product, performance, security, optimization, bugfix, tests, refactor, dx\n- Prefer features that move the product forward, then hardening/performance/security\n- Propose ONLY improvements aligned with the existing system\n- DO NOT introduce new frameworks or platforms unless already present in dependencies or files\n- DO NOT introduce: ${CONFIG.FORBIDDEN_TECH_KEYWORDS.join(", ")}\n- NEVER suggest protected/internal files\n- NEVER suggest blocked env/config secret files such as .env or .env.example\n- Prefer improving existing modules, bugfixes, tests, validation, security hardening, performance, DX\n- Only propose small or medium shippable tasks\n- Max ${CONFIG.MAX_FILES_PER_TASK} files per task\n- Always include real file paths when possible\n- Consider previously completed tasks and the auto evolution log so the project keeps evolving instead of repeating itself\n\nReturn ONLY valid JSON in this exact shape:\n{\n  "summary": "short summary of repo direction",\n  "tasks": [\n    {\n      "id": "task-short-id",\n      "title": "short title",\n      "category": "security|performance|product|optimization|bugfix|refactor|dx|tests",\n      "priority": "high|medium|low",\n      "goal": "what should be improved",\n      "why": "why this matters",\n      "files": ["real/path1", "real/path2"],\n      "new_files_allowed": true,\n      "commit_message": "feat/fix/chore/test/refactor/perf: concise message"\n    }\n  ]\n}`;
+    return `You are an autonomous principal software engineer evolving a real production system.\n\nSOURCE OF TRUTH:\nThe blueprint below defines the product, architecture, goals, and constraints.\nYou must obey it strictly.\n\nBLUEPRINT:\n${blueprint.content}\n\nCURRENT BRANCH:\n${branch}\n\nPACKAGE SUMMARY:\n${snapshot.packageSummary}\n\nKNOWN FILES:\n${snapshot.fileList}\n\nIMPORTANT FILE EXCERPTS:\n${snapshot.fileContexts}\n\nMAIN EVOLUTION DOCUMENT EXCERPT:\n${snapshot.evolutionDocSummary || "(empty)"}\n\nKNOWN DEPENDENCIES:\n${JSON.stringify(snapshot.dependencySummary.slice(0, 120), null, 2)}\n\nLEARNED SUCCESSES:\n${JSON.stringify(memory.accepted.slice(0, 10), null, 2)}\n\nLEARNED FAILURES:\n${JSON.stringify(memory.failed.slice(0, 10), null, 2)}\n\nPREVIOUS SUCCESSFUL TASK SIGNATURES:\n${JSON.stringify(memory.learned.successfulTaskSignatures.slice(0, 20), null, 2)}\n\nPREVIOUS FAILED TASK SIGNATURES:\n${JSON.stringify(memory.learned.failedTaskSignatures.slice(0, 20), null, 2)}\n\nHOT FILES WITH RECENT FAILURES:\n${JSON.stringify(getHotFiles(memory), null, 2)}\n\nLEARNED NEXT OPPORTUNITIES:\n${JSON.stringify((memory.learned.nextOpportunityPatterns || []).slice(0, 20), null, 2)}\n\nLEARNED DEPENDENCY INSTALLS:\n${JSON.stringify((memory.learned.dependencyInstallPatterns || []).slice(0, 20), null, 2)}\n\nCRITICAL RULES:\n- Read the blueprint and continuously create useful tasks forever\n- Generate tasks in these categories whenever relevant: product, performance, security, optimization, bugfix, tests, refactor, dx\n- Prefer features that move the product forward, then hardening/performance/security\n- Propose ONLY improvements aligned with the existing system\n- DO NOT introduce new frameworks or platforms unless already present in dependencies or files\n- DO NOT introduce: ${CONFIG.FORBIDDEN_TECH_KEYWORDS.join(", ")}\n- NEVER suggest protected/internal files\n- NEVER suggest blocked env/config secret files such as .env or .env.example\n- Prefer improving existing modules, bugfixes, tests, validation, security hardening, performance, DX\n- If the repository is unhealthy, prefer repo stabilization and tooling fixes over new features\n- Only propose small or medium shippable tasks\n- Max ${CONFIG.MAX_FILES_PER_TASK} files per task\n- Always include real file paths when possible\n- Consider previously completed tasks and the auto evolution log so the project keeps evolving instead of repeating itself\n\nReturn ONLY valid JSON in this exact shape:\n{\n  "summary": "short summary of repo direction",\n  "tasks": [\n    {\n      "id": "task-short-id",\n      "title": "short title",\n      "category": "security|performance|product|optimization|bugfix|refactor|dx|tests",\n      "priority": "high|medium|low",\n      "goal": "what should be improved",\n      "why": "why this matters",\n      "files": ["real/path1", "real/path2"],\n      "new_files_allowed": true,\n      "commit_message": "feat/fix/chore/test/refactor/perf: concise message"\n    }\n  ]\n}`;
 }
 
 function buildExecutorPrompt({ blueprint, task, fileContexts, commands, memory }) {
-    return `You are implementing one task in a production codebase.\n\nSOURCE OF TRUTH:\n${blueprint.content}\n\nTASK:\n${JSON.stringify(task, null, 2)}\n\nPROJECT COMMANDS:\n${JSON.stringify(commands, null, 2)}\n\nCURRENT FILES:\n${fileContexts}\n\nLEARNED FAILURES:\n${JSON.stringify(memory.failed.slice(0, 8), null, 2)}\n\nCRITICAL IMPLEMENTATION RULES:\n- Implement ONLY this task\n- Respect the blueprint and current stack\n- Keep scope safe but COMPLETE\n- Do not modify unrelated files\n- Do not modify .env, .env.example or protected files\n- Use exact relative repo paths\n- Existing files must be fully rewritten in output\n- New files only if task justifies it\n- Focus on delivering working code that passes lint, typecheck, build and tests\n- NEVER modify or access protected files\n- Never introduce forbidden technologies\n\nReturn ONLY valid JSON in this exact shape:\n{\n  "summary": "what changed",\n  "files": [\n    {\n      "path": "relative/path.ext",\n      "action": "update|create",\n      "content": "full file content"\n    }\n  ],\n  "delete_files": [],\n  "notes": ["important note 1", "important note 2"]\n}`;
+    return `You are implementing one task in a production codebase.\n\nSOURCE OF TRUTH:\n${blueprint.content}\n\nTASK:\n${JSON.stringify(task, null, 2)}\n\nPROJECT COMMANDS:\n${JSON.stringify(commands, null, 2)}\n\nCURRENT FILES:\n${fileContexts}\n\nLEARNED FAILURES:\n${JSON.stringify(memory.failed.slice(0, 8), null, 2)}\n\nCRITICAL IMPLEMENTATION RULES:\n- Implement ONLY this task\n- Respect the blueprint and current stack\n- Keep scope safe but COMPLETE\n- Do not modify unrelated files\n- Do not modify .env, .env.example or protected files\n- Use exact relative repo paths\n- Existing files must be fully rewritten in output\n- New files only if task justifies it\n- Focus on delivering working code that passes lint, typecheck, build and tests\n- NEVER modify or access protected files\n- Never introduce forbidden technologies\n- NEVER add comments to JSON files\n- NEVER output invalid JSON for package.json, tsconfig.json, or other .json files\n\nReturn ONLY valid JSON in this exact shape:\n{\n  "summary": "what changed",\n  "files": [\n    {\n      "path": "relative/path.ext",\n      "action": "update|create",\n      "content": "full file content"\n    }\n  ],\n  "delete_files": [],\n  "notes": ["important note 1", "important note 2"]\n}`;
 }
 
 function buildReviewerPrompt({ blueprint, task, implementation, diff }) {
-    return `You are a strict senior reviewer.\n\nSOURCE OF TRUTH:\n${blueprint.content}\n\nTASK:\n${JSON.stringify(task, null, 2)}\n\nIMPLEMENTATION:\n${JSON.stringify(implementation, null, 2)}\n\nDIFF:\n${truncate(diff, 45000)}\n\nApprove only if:\n- it matches the blueprint\n- it matches the task\n- files are relevant\n- risk is acceptable\n- code is coherent\n- no obvious breakage\n- no secrets or destructive operations\n- no unrelated changes\n- no protected files are touched\n- no blocked config files like .env.example are touched\n- no new frameworks outside current stack\n\nReturn ONLY valid JSON:\n{\n  "verdict": "APPROVED|REJECTED",\n  "reason": "short reason",\n  "warnings": ["warning 1"],\n  "suggested_commit_message": "optional improved commit message"\n}`;
+    return `You are a strict senior reviewer.\n\nSOURCE OF TRUTH:\n${blueprint.content}\n\nTASK:\n${JSON.stringify(task, null, 2)}\n\nIMPLEMENTATION:\n${JSON.stringify(implementation, null, 2)}\n\nDIFF:\n${truncate(diff, 45000)}\n\nApprove only if:\n- it matches the blueprint\n- it matches the task\n- files are relevant\n- risk is acceptable\n- code is coherent\n- no obvious breakage\n- no secrets or destructive operations\n- no unrelated changes\n- no protected files are touched\n- no blocked config files like .env.example are touched\n- no new frameworks outside current stack\n- JSON files remain valid JSON\n\nReturn ONLY valid JSON:\n{\n  "verdict": "APPROVED|REJECTED",\n  "reason": "short reason",\n  "warnings": ["warning 1"],\n  "suggested_commit_message": "optional improved commit message"\n}`;
 }
 
 function buildSelfHealPrompt({ blueprint, task, implementation, failedSummary, currentFiles, commands }) {
-    return `You are a senior engineer fixing a broken codebase.\n\nSOURCE OF TRUTH:\n${blueprint.content}\n\nTASK:\n${JSON.stringify(task, null, 2)}\n\nPREVIOUS IMPLEMENTATION:\n${JSON.stringify(implementation, null, 2)}\n\nPROJECT COMMANDS:\n${JSON.stringify(commands, null, 2)}\n\nFAILURE OUTPUT (VERY IMPORTANT):\n${failedSummary}\n\nCURRENT FILES AND ERROR CONTEXT:\n${currentFiles}\n\nCRITICAL RULES:\n- You MUST fix ALL errors until the project passes\n- Fix lint, type errors, build errors, import errors, path alias issues, runtime issues and tests\n- You can modify any file directly related to the failure\n- Keep changes minimal but COMPLETE\n- Do not introduce new frameworks\n- Do not touch protected files\n- Do not touch .env, .env.example or secret files\n- Prioritize actual delivery over partial changes\n\nRETURN ONLY VALID JSON:\n{\n  "summary": "what was fixed",\n  "files": [\n    {\n      "path": "relative/path.ext",\n      "action": "update|create",\n      "content": "full file content"\n    }\n  ],\n  "delete_files": [],\n  "notes": ["..."]\n}`;
+    return `You are a senior engineer fixing a broken codebase.\n\nSOURCE OF TRUTH:\n${blueprint.content}\n\nTASK:\n${JSON.stringify(task, null, 2)}\n\nPREVIOUS IMPLEMENTATION:\n${JSON.stringify(implementation, null, 2)}\n\nPROJECT COMMANDS:\n${JSON.stringify(commands, null, 2)}\n\nFAILURE OUTPUT (VERY IMPORTANT):\n${failedSummary}\n\nCURRENT FILES AND ERROR CONTEXT:\n${currentFiles}\n\nCRITICAL RULES:\n- You MUST fix ALL errors until the project passes\n- Fix lint, type errors, build errors, import errors, path alias issues, runtime issues and tests\n- If the failure indicates missing ESLint/TypeScript packages, prefer fixing config and dependency setup first\n- If the failure mentions parsing errors in TypeScript decorators, do NOT remove NestJS decorators as a fix\n- You can modify any file directly related to the failure\n- Keep changes minimal but COMPLETE\n- Do not introduce new frameworks\n- Do not touch protected files\n- Do not touch .env, .env.example or secret files\n- NEVER add comments to JSON files\n- Prioritize actual delivery over partial changes\n\nRETURN ONLY VALID JSON:\n{\n  "summary": "what was fixed",\n  "files": [\n    {\n      "path": "relative/path.ext",\n      "action": "update|create",\n      "content": "full file content"\n    }\n  ],\n  "delete_files": [],\n  "notes": ["..."]\n}`;
 }
 
 function detectForbiddenKeywordsInTask(task) {
@@ -1155,6 +1208,33 @@ function validateBacklog(backlog, repoIndex, memory) {
     return backlog;
 }
 
+function isJsonFilePath(filePath) {
+    return normalizeSlashes(filePath).toLowerCase().endsWith(".json");
+}
+
+function detectJsonCommentViolation(content) {
+    const text = String(content || "").trimStart();
+    return text.startsWith("//") || text.startsWith("/*");
+}
+
+function validateJsonContent(filePath, content) {
+    if (!isJsonFilePath(filePath)) return { ok: true };
+
+    if (detectJsonCommentViolation(content)) {
+        return { ok: false, reason: `json_comment_not_allowed:${filePath}` };
+    }
+
+    try {
+        JSON.parse(String(content));
+        return { ok: true };
+    } catch (err) {
+        return {
+            ok: false,
+            reason: `invalid_json:${filePath}:${sanitizeOneLine(err.message || String(err), 220)}`,
+        };
+    }
+}
+
 function sanitizeImplementation(impl, task) {
     if (!impl || typeof impl !== "object") throw new Error("Implementação inválida.");
     if (!Array.isArray(impl.files)) impl.files = [];
@@ -1193,6 +1273,12 @@ function sanitizeImplementation(impl, task) {
 
         if (f.action === "create" && !CONFIG.ALLOW_NEW_FILES && !task.new_files_allowed) {
             skipped.push({ path: normalizeSlashes(f.path), reason: "create_not_allowed", fatal: false });
+            continue;
+        }
+
+        const jsonValidation = validateJsonContent(f.path, f.content);
+        if (!jsonValidation.ok) {
+            skipped.push({ path: normalizeSlashes(f.path), reason: jsonValidation.reason, fatal: false });
             continue;
         }
 
@@ -1343,6 +1429,10 @@ function applyImplementation(impl) {
         if (isProtectedFile(file.path)) {
             throw new Error(`Arquivo protegido bloqueado: ${file.path}`);
         }
+        const jsonValidation = validateJsonContent(file.path, file.content);
+        if (!jsonValidation.ok) {
+            throw new Error(`Conteúdo inválido para ${file.path}: ${jsonValidation.reason}`);
+        }
         safeWrite(abs(file.path), file.content);
         touched.push(normalizeSlashes(file.path));
     }
@@ -1385,6 +1475,168 @@ function ensureSafeStart() {
     }
 }
 
+function getPackageManifest() {
+    const pkg = readPackageJsonSafe();
+    if (!pkg) return null;
+    return {
+        raw: pkg,
+        dependencies: pkg.dependencies || {},
+        devDependencies: pkg.devDependencies || {},
+        all: {
+            ...(pkg.dependencies || {}),
+            ...(pkg.devDependencies || {}),
+        },
+    };
+}
+
+function isSafePackageName(name) {
+    return /^(?:@[\w.-]+\/)?[\w.-]+$/.test(String(name || ""));
+}
+
+function extractMissingPackagesFromError(text) {
+    const src = String(text || "");
+    const found = new Set();
+
+    const patterns = [
+        /Cannot find module ['"]([^'"]+)['"]/gi,
+        /Cannot find package ['"]([^'"]+)['"]/gi,
+        /Failed to load plugin ['"]([^'"]+)['"]/gi,
+        /Failed to load parser ['"]([^'"]+)['"]/gi,
+        /Error \[ERR_MODULE_NOT_FOUND\]: Cannot find package ['"]([^'"]+)['"]/gi,
+        /Cannot resolve module ['"]([^'"]+)['"]/gi,
+    ];
+
+    for (const re of patterns) {
+        let match;
+        while ((match = re.exec(src))) {
+            const name = String(match[1] || "").trim();
+            if (!name) continue;
+            if (name.startsWith(".")) continue;
+            if (name.startsWith("/")) continue;
+            found.add(name);
+        }
+    }
+
+    return [...found];
+}
+
+function inferPackagesFromFailure(text) {
+    const low = String(text || "").toLowerCase();
+    const inferred = new Set();
+
+    if (
+        low.includes("parsing error: unexpected character '@'") ||
+        low.includes("parsing error: unexpected token :")
+    ) {
+        inferred.add("@typescript-eslint/parser");
+        inferred.add("@typescript-eslint/eslint-plugin");
+        inferred.add("typescript");
+    }
+
+    if (low.includes("eslint.config.mjs") && low.includes("@eslint/js")) {
+        inferred.add("@eslint/js");
+    }
+
+    if (low.includes("failed to load parser") && low.includes("@typescript-eslint/parser")) {
+        inferred.add("@typescript-eslint/parser");
+        inferred.add("typescript");
+    }
+
+    if (low.includes("failed to load plugin") && low.includes("@typescript-eslint/eslint-plugin")) {
+        inferred.add("@typescript-eslint/eslint-plugin");
+    }
+
+    if (low.includes("ts-jest") && low.includes("cannot find")) {
+        inferred.add("ts-jest");
+        inferred.add("jest");
+        inferred.add("typescript");
+    }
+
+    return [...inferred];
+}
+
+function getInstallCandidates(failureText) {
+    const manifest = getPackageManifest();
+    if (!manifest) return [];
+
+    const explicit = extractMissingPackagesFromError(failureText);
+    const inferred = inferPackagesFromFailure(failureText);
+
+    return unique([...explicit, ...inferred])
+        .filter(isSafePackageName)
+        .filter((name) => !manifest.all[name]);
+}
+
+function installPackages(packages, { dev = true } = {}) {
+    if (!packages.length) return { ok: true, command: "", stdout: "", stderr: "" };
+
+    const manager = detectPackageManager();
+    const safePkgs = packages.filter(isSafePackageName);
+
+    if (!safePkgs.length) {
+        return { ok: false, command: "", stdout: "", stderr: "Nenhum pacote seguro para instalar." };
+    }
+
+    let command = "";
+    if (manager === "pnpm") {
+        command = `pnpm add ${dev ? "-D " : ""}${safePkgs.join(" ")}`;
+    } else if (manager === "yarn") {
+        command = `yarn add ${dev ? "-D " : ""}${safePkgs.join(" ")}`;
+    } else {
+        command = `npm install ${dev ? "-D " : ""}${safePkgs.join(" ")}`;
+    }
+
+    log(`📦 auto-install: ${command}`);
+    return { ...run(command, { cwd: CONFIG.REPO_PATH }), command };
+}
+
+function classifyFailure(summary = "") {
+    const low = String(summary).toLowerCase();
+    return {
+        eslintParserTs:
+            low.includes("parsing error: unexpected character '@'") ||
+            low.includes("parsing error: unexpected token :"),
+        eslintNoUndefConsole: low.includes("'console' is not defined"),
+        importOrExport:
+            low.includes("cannot find module") ||
+            low.includes("is not exported") ||
+            low.includes("err_module_not_found"),
+        typescript: /ts\d+|typescript|cannot find name/i.test(low),
+        missingPackage:
+            low.includes("cannot find package") ||
+            low.includes("cannot find module") ||
+            low.includes("failed to load parser") ||
+            low.includes("failed to load plugin"),
+    };
+}
+
+function getMandatoryDiagnosticFiles(failureSummary) {
+    const kind = classifyFailure(failureSummary);
+    const base = ["package.json", "tsconfig.json", "jsconfig.json", "nest-cli.json"];
+
+    if (kind.eslintParserTs || kind.eslintNoUndefConsole || kind.missingPackage) {
+        base.push(
+            ".eslintrc",
+            ".eslintrc.js",
+            ".eslintrc.cjs",
+            "eslint.config.js",
+            "eslint.config.cjs",
+            "eslint.config.mjs"
+        );
+    }
+
+    return unique(base.filter((p) => exists(abs(p))));
+}
+
+function getRepoHealth(memory) {
+    const checks = runVerification(memory);
+    return {
+        ok: checks.ok,
+        summary: summarizeVerificationResults(checks.verifyResults, checks.testResults),
+        checks,
+    };
+}
+
 async function askAndParseJson(model, prompt, label, validator = null) {
     let lastRaw = "";
 
@@ -1404,7 +1656,7 @@ async function askAndParseJson(model, prompt, label, validator = null) {
         }
 
         log(`⚠️ falha ao parsear ${label}, tentativa ${i}/${CONFIG.MAX_PARSE_RETRIES}`);
-        prompt += `\n\nIMPORTANT:\nReturn ONLY valid JSON.\nDo not use markdown.\nDo not include explanations.\nEnsure all strings are properly escaped.\nThe response must be directly parsable by JSON.parse.`;
+        prompt += `\n\nIMPORTANT:\nReturn ONLY valid JSON.\nDo not use markdown.\nDo not include explanations.\nEnsure all strings are properly escaped.\nThe response must be directly parsable by JSON.parse.\nNever add comments to JSON content.`;
     }
 
     throw new Error(`Falha ao parsear ${label}.\nRAW:\n${truncate(lastRaw, 8000)}`);
@@ -1454,16 +1706,85 @@ function runVerification(memory) {
     return { ok: verifyOk && testOk, verifyResults, testResults };
 }
 
+async function tryAutoInstallForFailure({ failedSummary, memory }) {
+    if (!CONFIG.AUTO_INSTALL_MISSING_PACKAGES) {
+        return { attempted: false, ok: false, installed: [] };
+    }
+
+    const candidates = getInstallCandidates(failedSummary)
+        .slice(0, CONFIG.MAX_AUTO_INSTALLS_PER_ITERATION);
+
+    if (!candidates.length) {
+        return { attempted: false, ok: false, installed: [] };
+    }
+
+    memory.metrics.installs += 1;
+    const installRes = installPackages(candidates, { dev: CONFIG.ALLOW_DEV_DEP_INSTALLS });
+
+    if (!installRes.ok) {
+        memory.metrics.installFail += 1;
+        log(`⚠️ auto-install failed: ${installRes.stderr || installRes.stdout}`);
+        return {
+            attempted: true,
+            ok: false,
+            installed: candidates,
+            installResult: installRes,
+        };
+    }
+
+    memory.metrics.installSuccess += 1;
+    rememberInstalledPackages(memory, candidates, failedSummary);
+    saveMemory(memory);
+    log(`📦 installed: ${candidates.join(", ")}`);
+
+    const postInstallChecks = runVerification(memory);
+    return {
+        attempted: true,
+        ok: postInstallChecks.ok,
+        installed: candidates,
+        checks: postInstallChecks,
+        installResult: installRes,
+    };
+}
+
 async function trySelfHeal({ blueprint, task, implementation, checks, memory }) {
     let failedSummary = summarizeVerificationResults(checks.verifyResults, checks.testResults);
     let currentImpl = implementation;
     const commands = detectProjectCommands();
 
+    const autoInstall = await tryAutoInstallForFailure({ failedSummary, memory });
+    if (autoInstall.attempted) {
+        if (autoInstall.ok) {
+            memory.metrics.selfHealSuccess += 1;
+            return {
+                ok: true,
+                implementation: currentImpl,
+                checks: autoInstall.checks,
+                lastFailedSummary: failedSummary,
+            };
+        }
+
+        if (autoInstall.checks) {
+            failedSummary = summarizeVerificationResults(
+                autoInstall.checks.verifyResults,
+                autoInstall.checks.testResults
+            ) || failedSummary;
+        }
+    }
+
     for (let attempt = 1; attempt <= CONFIG.MAX_SELF_HEAL_ATTEMPTS; attempt += 1) {
         log(`🩹 self-heal attempt ${attempt}/${CONFIG.MAX_SELF_HEAL_ATTEMPTS}`);
 
         const errorFiles = extractRelevantFilesFromErrors(failedSummary);
-        const currentFiles = collectFileContents(unique([...(task.files || []), ...errorFiles]).slice(0, CONFIG.MAX_CONTEXT_FILES));
+        const diagnosticFiles = getMandatoryDiagnosticFiles(failedSummary);
+        const currentFiles = collectFileContents(
+            unique([
+                ...(task.files || []),
+                ...errorFiles,
+                ...diagnosticFiles,
+                ...(currentImpl?.files || []).map((f) => f.path),
+            ]).slice(0, CONFIG.MAX_CONTEXT_FILES)
+        );
 
         const prompt = buildSelfHealPrompt({
             blueprint,
@@ -1509,6 +1830,7 @@ async function trySelfHeal({ blueprint, task, implementation, checks, memory }) 
                     ok: true,
                     implementation: mergeImplementations(currentImpl, fixedImpl),
                     checks: newChecks,
+                    lastFailedSummary: failedSummary,
                 };
             }
 
@@ -1523,7 +1845,7 @@ async function trySelfHeal({ blueprint, task, implementation, checks, memory }) 
     }
 
     memory.metrics.selfHealFail += 1;
-    return { ok: false };
+    return { ok: false, implementation: currentImpl, lastFailedSummary: failedSummary };
 }
 
 function shouldDropTaskAfterFailure(memory, task, errorMessage) {
@@ -1537,6 +1859,8 @@ function shouldDropTaskAfterFailure(memory, task, errorMessage) {
         "blocked_extension",
         "blocked_name:.env.example",
         "arquivo protegido",
+        "json_comment_not_allowed",
+        "invalid_json:",
     ];
 
     const isStructural = structuralPatterns.some((pattern) => low.includes(pattern));
@@ -1580,6 +1904,25 @@ function registerFailureAndDecide(memory, task, reason, implementation) {
     saveMemory(memory);
 }
 
+function createRepoStabilizationTask(repoHealth) {
+    const files = unique([
+        ...extractRelevantFilesFromErrors(repoHealth.summary || ""),
+        ...getMandatoryDiagnosticFiles(repoHealth.summary || ""),
+    ]);
+
+    return {
+        id: `stabilize-${Date.now()}`,
+        title: "Stabilize repository tooling and compilation",
+        category: "bugfix",
+        priority: "high",
+        goal: "Fix current lint, typecheck, build, dependency, or test failures before any product evolution",
+        why: sanitizeOneLine(repoHealth.summary || "repository health check failed", 240),
+        files: files.slice(0, CONFIG.MAX_FILES_PER_TASK),
+        new_files_allowed: false,
+        commit_message: "fix: stabilize repository tooling and compilation",
+    };
+}
+
 async function main() {
     acquireLock();
 
@@ -1601,6 +1944,7 @@ async function main() {
         log("📘 blueprint:", CONFIG.BLUEPRINT_FILE);
         log("📝 main evolution doc:", CONFIG.MAIN_EVOLUTION_DOC);
         log("🌿 branch:", branch);
+        log("📦 package manager:", detectPackageManager());
 
         for (let i = 0; i < CONFIG.MAX_ITERATIONS; i += 1) {
             memory = loadMemory();
@@ -1611,26 +1955,33 @@ async function main() {
             let task = null;
 
             try {
-                if (!Array.isArray(memory.backlog) || memory.backlog.length === 0) {
-                    log("🗺️ generating backlog from blueprint...");
-                    const freshBacklog = await generateBacklog(memory, blueprint, buildRepoIndex());
-                    memory.metrics.plannerRuns += 1;
-                    memory.backlog = freshBacklog.tasks || [];
-                    pushHistory(memory, {
-                        type: "backlog_generated",
-                        total: memory.backlog.length,
-                        summary: freshBacklog.summary || "",
-                    });
-                    saveMemory(memory);
-                }
+                const repoHealth = getRepoHealth(memory);
 
-                task = pickNextTask(memory);
-                if (!task) {
-                    log("⏸️ no valid task available, regenerating backlog on next loop");
-                    memory.backlog = [];
-                    saveMemory(memory);
-                    await sleep(CONFIG.LOOP_DELAY_MS);
-                    continue;
+                if (CONFIG.REPO_STABILIZATION_MODE && !repoHealth.ok) {
+                    log("🛠️ repo unhealthy, entering stabilization mode");
+                    task = createRepoStabilizationTask(repoHealth);
+                } else {
+                    if (!Array.isArray(memory.backlog) || memory.backlog.length === 0) {
+                        log("🗺️ generating backlog from blueprint.");
+                        const freshBacklog = await generateBacklog(memory, blueprint, buildRepoIndex());
+                        memory.metrics.plannerRuns += 1;
+                        memory.backlog = freshBacklog.tasks || [];
+                        pushHistory(memory, {
+                            type: "backlog_generated",
+                            total: memory.backlog.length,
+                            summary: freshBacklog.summary || "",
+                        });
+                        saveMemory(memory);
+                    }
+
+                    task = pickNextTask(memory);
+                    if (!task) {
+                        log("⏸️ no valid task available, regenerating backlog on next loop");
+                        memory.backlog = [];
+                        saveMemory(memory);
+                        await sleep(CONFIG.LOOP_DELAY_MS);
+                        continue;
+                    }
                 }
 
                 log(`🎯 task: [${task.category}/${task.priority}] ${task.title}`);
@@ -1686,8 +2037,8 @@ async function main() {
                         registerFailureAndDecide(
                             memory,
                             task,
-                            summarizeVerificationResults(checks.verifyResults, checks.testResults) || "verification failed",
-                            implementation
+                            healed.lastFailedSummary || summarizeVerificationResults(checks.verifyResults, checks.testResults) || "verification failed",
+                            healed.implementation || implementation
                         );
                         await sleep(CONFIG.LOOP_DELAY_MS);
                         continue;
@@ -1704,17 +2055,26 @@ async function main() {
                     continue;
                 }
 
+                const finalReview = await reviewImplementation(task, blueprint, finalImplementation);
+                if (String(finalReview.verdict || "").toUpperCase() !== "APPROVED") {
+                    memory.metrics.rejections += 1;
+                    rollbackHard();
+                    registerFailureAndDecide(memory, task, `final review rejected: ${finalReview.reason || "no reason"}`, finalImplementation);
+                    await sleep(CONFIG.LOOP_DELAY_MS);
+                    continue;
+                }
+
                 log("✅ fully healed and verified");
 
                 const commitMessage = sanitizeOneLine(
-                    review.suggested_commit_message || task.commit_message || `chore: ${task.title}`,
+                    finalReview.suggested_commit_message || review.suggested_commit_message || task.commit_message || `chore: ${task.title}`,
                     180
                 );
 
                 const evolution = updateMainEvolutionDoc({
                     task,
                     implementation: finalImplementation,
-                    review,
+                    review: finalReview,
                     commitMessage,
                     memory,
                 });
@@ -1746,7 +2106,9 @@ async function main() {
 
                 rememberSuccess(memory, task, commitMessage);
                 clearTaskFailureBursts(memory, task);
-                removeTaskFromBacklog(memory, task.id);
+                if (!String(task.id).startsWith("stabilize-")) {
+                    removeTaskFromBacklog(memory, task.id);
+                }
                 pushHistory(memory, {
                     type: "task_completed",
                     title: task.title,
@@ -1766,7 +2128,9 @@ async function main() {
 
                     if (replans >= CONFIG.MAX_REPLAN_PER_TASK) {
                         log("⛔ dropping task after max replans");
-                        removeTaskFromBacklog(memory, task.id);
+                        if (!String(task.id).startsWith("stabilize-")) {
+                            removeTaskFromBacklog(memory, task.id);
+                        }
                         clearTaskFailureBursts(memory, task);
                     } else {
                         registerFailureAndDecide(memory, task, message, null);
