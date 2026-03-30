@@ -1,17 +1,1 @@
-// Updated tsconfig.json to include necessary compiler options for decorators and experimental features.
-{
-  "compilerOptions": {
-    "target": "es6",
-    "module": "commonjs",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "experimentalDecorators": true
-  },
-  "include": [
-    "src/**/*"
-  ]
-}
+{"compilerOptions": {"target": "ESNext","module": "commonjs","strict": true,"esModuleInterop": true,"skipLibCheck": true,"forceConsistentCasingInFileNames": true,"outDir": "./dist","experimentalDecorators": true},"include": ["src/**/*"]}
