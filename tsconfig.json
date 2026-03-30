@@ -1,1 +1,13 @@
-{"compilerOptions": {"target": "ESNext","module": "commonjs","strict": true,"esModuleInterop": true,"skipLibCheck": true,"forceConsistentCasingInFileNames": true,"outDir": "./dist","experimentalDecorators": true},"include": ["src/**/*"]}
+// Updated tsconfig to include necessary compiler options
+{
+  "compilerOptions": {
+    "target": "es6",
+    "module": "commonjs",
+    "outDir": "dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/**/*"]
+}

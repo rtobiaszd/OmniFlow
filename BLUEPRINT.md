@@ -482,6 +482,26 @@ evoluir o OmniFlow com segurança, consistência e melhorias contínuas reais.
 
 ## Auto Evolution Log
 
+### 2026-03-30T17:31:42.759Z | Add unit tests for monitoring utility
+- category: tests
+- priority: low
+- goal: Ensure that the monitoring utilities work as expected.
+- commit: Refactor monitoring utility and expand tests
+- files changed: src/utils/monitoring.spec.ts, tsconfig.json, package.json
+- files deleted: none
+- implementation summary: Installed 'supertest' package and added missing type definitions.
+- review reason: The task matches the blueprint and the changes are relevant, coherent, and within acceptable risk.
+- notes:
+- Added unit tests for monitoring utility.
+- Added import for 'request' and fixed lint error.
+- Added 'supertest' and its type definitions to the project.
+- Updated tsconfig.json to include necessary compiler options.
+- warnings:
+- none
+- next opportunities:
+- Improve developer experience around changed modules: src/utils/monitoring.spec.ts, tsconfig.json, package.json
+- Monitor regressions after Add unit tests for monitoring utility and harden validation where needed
+
 ### 2026-03-30T17:29:21.240Z | Resolve TypeScript errors in app.module.ts
 - category: bugfix
 - priority: high

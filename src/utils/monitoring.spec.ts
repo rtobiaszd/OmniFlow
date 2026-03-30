@@ -2,6 +2,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import { AppModule } from '../app.module';
+import request from 'supertest';
+
 
 describe('Monitoring', () => {
   let app: INestApplication;
@@ -15,7 +17,9 @@ describe('Monitoring', () => {
     await app.init();
   });
 
-  it('should start', () => {
+  it('should start', async () => {
     expect(app).toBeDefined();
+    const response = await request(app.getHttpServer()).get('/');
+    expect(response.status).toBe(200);
   });
 });
