@@ -479,3 +479,25 @@ Na dúvida, o agente deve:
 
 Objetivo final:
 evoluir o OmniFlow com segurança, consistência e melhorias contínuas reais.
+
+## Auto Evolution Log
+
+### 2026-03-30T16:42:19.123Z | Add unit tests for the new input validation functions
+- category: tests
+- priority: medium
+- goal: Ensure that all newly added input validation functions are working as expected.
+- commit: test: add unit tests for new input validation functions
+- files changed: ./src/services/validation.service.ts, ./src/services/validation.service.spec.ts, ./tsconfig.json, tsconfig.json, package.json, src/services/validation.service.spec.ts
+- files deleted: none
+- implementation summary: Installed type definitions for Jest and TypeScript errors fixed
+- review reason: The task aligns with the blueprint and improves the codebase by adding unit tests for input validation functions. The changes are relevant, low-risk, and coherent.
+- notes:
+- Added unit tests for the new input validation functions.
+- Updated tsconfig.json to ensure compatibility with the project setup.
+- Installed type definitions for Jest and TypeScript errors fixed
+- Mocked ValidationService for unit tests
+- warnings:
+- none
+- next opportunities:
+- Improve developer experience around changed modules: ./src/services/validation.service.ts, ./src/services/validation.service.spec.ts, ./tsconfig.json, tsconfig.json, package.json, src/services/validation.service.spec.ts
+- Monitor regressions after Add unit tests for the new input validation functions and harden validation where needed
