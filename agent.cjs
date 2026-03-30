@@ -41,6 +41,10 @@ const CONFIG = {
     MAX_HISTORY_ITEMS: Number(process.env.MAX_HISTORY_ITEMS || 500),
 
     MAX_REPEAT_FAILURES_PER_TASK: Number(process.env.MAX_REPEAT_FAILURES_PER_TASK || 8),
+    MAX_REPLAN_PER_TASK: Number(process.env.MAX_REPLAN_PER_TASK || 3),
+    MAX_HOT_FILES: Number(process.env.MAX_HOT_FILES || 20),
+    HOT_FILE_FAILURE_THRESHOLD: Number(process.env.HOT_FILE_FAILURE_THRESHOLD || 3),
+    EVOLUTION_DOC_CONTEXT_CHARS: Number(process.env.EVOLUTION_DOC_CONTEXT_CHARS || 18000),
     MAX_SELF_HEAL_ATTEMPTS: Number(process.env.MAX_SELF_HEAL_ATTEMPTS || 10),
     MAX_PARSE_RETRIES: Number(process.env.MAX_PARSE_RETRIES || 4),
     MAX_JSON_REPAIR_ATTEMPTS: Number(process.env.MAX_JSON_REPAIR_ATTEMPTS || 2),
@@ -407,7 +411,10 @@ function createMemory() {
             forbiddenKeywordsObserved: [],
             lintPatterns: [],
             buildPatterns: [],
-            testPatterns: []
+            testPatterns: [],
+            fileFailureStats: {},
+            taskReplanStats: {},
+            nextOpportunityPatterns: []
         },
         metrics: {
             iterations: 0,
@@ -424,6 +431,8 @@ function createMemory() {
             testFail: 0,
             selfHealSuccess: 0,
             selfHealFail: 0,
+            replans: 0,
+            blueprintUpdates: 0,
             lastSuccessAt: null,
             lastErrorAt: null
         }
@@ -451,7 +460,10 @@ function sanitizeMemory(raw) {
             forbiddenKeywordsObserved: Array.isArray(m?.learned?.forbiddenKeywordsObserved) ? m.learned.forbiddenKeywordsObserved : [],
             lintPatterns: Array.isArray(m?.learned?.lintPatterns) ? m.learned.lintPatterns : [],
             buildPatterns: Array.isArray(m?.learned?.buildPatterns) ? m.learned.buildPatterns : [],
-            testPatterns: Array.isArray(m?.learned?.testPatterns) ? m.learned.testPatterns : []
+            testPatterns: Array.isArray(m?.learned?.testPatterns) ? m.learned.testPatterns : [],
+            fileFailureStats: m?.learned?.fileFailureStats && typeof m.learned.fileFailureStats === "object" ? m.learned.fileFailureStats : {},
+            taskReplanStats: m?.learned?.taskReplanStats && typeof m.learned.taskReplanStats === "object" ? m.learned.taskReplanStats : {},
+            nextOpportunityPatterns: Array.isArray(m?.learned?.nextOpportunityPatterns) ? m.learned.nextOpportunityPatterns : []
         },
         metrics: {
             ...base.metrics,
@@ -469,7 +481,9 @@ function sanitizeMemory(raw) {
             testPass: Number(m?.metrics?.testPass || 0),
             testFail: Number(m?.metrics?.testFail || 0),
             selfHealSuccess: Number(m?.metrics?.selfHealSuccess || 0),
-            selfHealFail: Number(m?.metrics?.selfHealFail || 0)
+            selfHealFail: Number(m?.metrics?.selfHealFail || 0),
+            replans: Number(m?.metrics?.replans || 0),
+            blueprintUpdates: Number(m?.metrics?.blueprintUpdates || 0)
         }
     };
 }
@@ -535,6 +549,67 @@ function rememberFailure(memory, task, reason) {
             memory.learned.testPatterns = memory.learned.testPatterns.slice(0, 50);
         }
     }
+}
+
+function rememberNextOpportunities(memory, opportunities) {
+    const next = unique((opportunities || []).map((item) => sanitizeOneLine(item, 220)).filter(Boolean));
+    memory.learned.nextOpportunityPatterns = unique([
+        ...next,
+        ...(memory.learned.nextOpportunityPatterns || [])
+    ]).slice(0, 100);
+}
+
+function incrementTaskReplan(memory, task) {
+    const signature = stableTaskSignature(task);
+    const current = Number(memory.learned.taskReplanStats?.[signature] || 0);
+    memory.learned.taskReplanStats[signature] = current + 1;
+    return memory.learned.taskReplanStats[signature];
+}
+
+function getTaskReplanCount(memory, task) {
+    const signature = stableTaskSignature(task);
+    return Number(memory.learned.taskReplanStats?.[signature] || 0);
+}
+
+function rememberFileFailures(memory, files, reason) {
+    const stats = memory.learned.fileFailureStats || {};
+    const cleanFiles = unique((files || []).map(normalizeSlashes).filter(Boolean).filter((file) => !isProtectedFile(file)));
+
+    for (const file of cleanFiles) {
+        const current = stats[file] && typeof stats[file] === "object" ? stats[file] : {
+            count: 0,
+            lastReason: "",
+            lastAt: null
+        };
+
+        stats[file] = {
+            count: Number(current.count || 0) + 1,
+            lastReason: sanitizeOneLine(reason || "", 220),
+            lastAt: new Date().toISOString()
+        };
+    }
+
+    const sortedEntries = Object.entries(stats)
+        .sort((a, b) => Number(b[1]?.count || 0) - Number(a[1]?.count || 0))
+        .slice(0, CONFIG.MAX_HOT_FILES);
+
+    memory.learned.fileFailureStats = Object.fromEntries(sortedEntries);
+}
+
+function getHotFiles(memory) {
+    return Object.entries(memory.learned.fileFailureStats || {})
+        .filter(([, meta]) => Number(meta?.count || 0) >= CONFIG.HOT_FILE_FAILURE_THRESHOLD)
+        .sort((a, b) => Number(b[1]?.count || 0) - Number(a[1]?.count || 0))
+        .map(([file]) => file)
+        .slice(0, CONFIG.MAX_HOT_FILES);
+}
+
+function collectFailureFiles(task, reason, implementation) {
+    return unique([
+        ...((task && Array.isArray(task.files)) ? task.files : []),
+        ...extractRelevantFilesFromErrors(reason || ""),
+        ...((implementation && Array.isArray(implementation.files)) ? implementation.files.map((item) => item.path) : [])
+    ]).filter(Boolean);
 }
 
 /* ========================= SHELL / GIT ========================= */
@@ -793,11 +868,17 @@ function buildRepoSnapshot(index) {
 
     const fileContexts = index.importantFiles.map((f) => readFileContext(f)).join("\n\n");
 
+    const evolutionDocPath = abs(CONFIG.MAIN_EVOLUTION_DOC);
+    const evolutionDocSummary = exists(evolutionDocPath)
+        ? truncate(safeRead(evolutionDocPath, ""), CONFIG.EVOLUTION_DOC_CONTEXT_CHARS)
+        : "";
+
     return {
         packageSummary,
         dependencySummary,
         fileList: index.rels.slice(0, 1500).join("\n"),
-        fileContexts
+        fileContexts,
+        evolutionDocSummary
     };
 }
 
@@ -890,9 +971,58 @@ function summarizeVerificationResults(verifyResults, testResults) {
     ].filter(Boolean).join("\n\n");
 }
 
+function mergeImplementations(baseImpl, nextImpl) {
+    const baseFiles = Array.isArray(baseImpl?.files) ? baseImpl.files : [];
+    const nextFiles = Array.isArray(nextImpl?.files) ? nextImpl.files : [];
+    const fileMap = new Map();
+
+    for (const file of [...baseFiles, ...nextFiles]) {
+        if (!file || !file.path) continue;
+        fileMap.set(normalizeSlashes(file.path), {
+            path: normalizeSlashes(file.path),
+            action: file.action || (exists(abs(file.path)) ? "update" : "create"),
+            content: String(file.content || "")
+        });
+    }
+
+    return {
+        summary: sanitizeOneLine(nextImpl?.summary || baseImpl?.summary || "implementation updated", 320),
+        files: [...fileMap.values()],
+        delete_files: unique([
+            ...(Array.isArray(baseImpl?.delete_files) ? baseImpl.delete_files : []),
+            ...(Array.isArray(nextImpl?.delete_files) ? nextImpl.delete_files : [])
+        ].map(normalizeSlashes)),
+        notes: unique([
+            ...(Array.isArray(baseImpl?.notes) ? baseImpl.notes : []),
+            ...(Array.isArray(nextImpl?.notes) ? nextImpl.notes : [])
+        ])
+    };
+}
+
+function deriveNextOpportunities({ task, implementation, review }) {
+    const touchedFiles = unique((implementation?.files || []).map((item) => normalizeSlashes(item.path))).slice(0, 6);
+    const opportunities = [];
+
+    if (task?.category !== "tests" && touchedFiles.length) {
+        opportunities.push(`Add or expand automated tests for: ${touchedFiles.join(", ")}`);
+    }
+
+    if (task?.category !== "dx" && touchedFiles.length) {
+        opportunities.push(`Improve developer experience around changed modules: ${touchedFiles.join(", ")}`);
+    }
+
+    if ((review?.warnings || []).length) {
+        opportunities.push(`Resolve remaining reviewer warnings related to ${sanitizeOneLine(task?.title || "this task", 120)}`);
+    }
+
+    opportunities.push(`Monitor regressions after ${sanitizeOneLine(task?.title || "recent delivery", 120)} and harden validation where needed`);
+
+    return unique(opportunities).slice(0, 4);
+}
+
 /* ========================= MAIN DOCUMENT EVOLUTION ========================= */
 
-function buildEvolutionEntry({ task, implementation, review, commitMessage }) {
+function buildEvolutionEntry({ task, implementation, review, commitMessage, nextOpportunities }) {
     const touchedFiles = implementation?.files?.map((file) => file.path) || [];
     const deletedFiles = implementation?.delete_files || [];
     const notes = implementation?.notes || [];
@@ -909,7 +1039,8 @@ function buildEvolutionEntry({ task, implementation, review, commitMessage }) {
         `- implementation summary: ${sanitizeOneLine(implementation?.summary || "completed successfully", 320)}`,
         `- review reason: ${sanitizeOneLine(review?.reason || "approved", 220)}`,
         `- notes:\n${listToBullets(notes)}`,
-        `- warnings:\n${listToBullets(warnings)}`
+        `- warnings:\n${listToBullets(warnings)}`,
+        `- next opportunities:\n${listToBullets(nextOpportunities)}`
     ].join("\n");
 }
 
@@ -937,13 +1068,23 @@ function upsertEvolutionSection(originalContent, entry) {
     return `${before}\n\n${updated}\n`;
 }
 
-function updateMainEvolutionDoc({ task, implementation, review, commitMessage }) {
+function updateMainEvolutionDoc({ task, implementation, review, commitMessage, memory }) {
     const target = abs(CONFIG.MAIN_EVOLUTION_DOC);
     const previous = safeRead(target, "");
-    const entry = buildEvolutionEntry({ task, implementation, review, commitMessage });
+    const nextOpportunities = deriveNextOpportunities({ task, implementation, review });
+    const entry = buildEvolutionEntry({ task, implementation, review, commitMessage, nextOpportunities });
     const next = upsertEvolutionSection(previous, entry);
     safeWrite(target, next);
-    return rel(target);
+
+    if (memory) {
+        rememberNextOpportunities(memory, nextOpportunities);
+        memory.metrics.blueprintUpdates = Number(memory.metrics.blueprintUpdates || 0) + 1;
+    }
+
+    return {
+        path: rel(target),
+        nextOpportunities
+    };
 }
 
 /* ========================= AI ========================= */
@@ -987,6 +1128,9 @@ ${snapshot.fileList}
 IMPORTANT FILE EXCERPTS:
 ${snapshot.fileContexts}
 
+MAIN EVOLUTION DOCUMENT EXCERPT:
+${snapshot.evolutionDocSummary || "(empty)"}
+
 KNOWN DEPENDENCIES:
 ${JSON.stringify(snapshot.dependencySummary.slice(0, 120), null, 2)}
 
@@ -1001,6 +1145,12 @@ ${JSON.stringify(memory.learned.successfulTaskSignatures.slice(0, 20), null, 2)}
 
 PREVIOUS FAILED TASK SIGNATURES:
 ${JSON.stringify(memory.learned.failedTaskSignatures.slice(0, 20), null, 2)}
+
+HOT FILES WITH RECENT FAILURES:
+${JSON.stringify(getHotFiles(memory), null, 2)}
+
+LEARNED NEXT OPPORTUNITIES:
+${JSON.stringify((memory.learned.nextOpportunityPatterns || []).slice(0, 20), null, 2)}
 
 CRITICAL RULES:
 - Read the blueprint and continuously create useful tasks forever
@@ -1355,12 +1505,19 @@ function pickNextTask(memory) {
     const backlog = Array.isArray(memory.backlog) ? memory.backlog : [];
     if (!backlog.length) return null;
 
+    const hotFiles = new Set(getHotFiles(memory));
+
     const candidates = backlog
         .filter((task) => !wasTaskSuccessful(memory, task))
         .filter((task) => countTaskFailures(memory, task) < CONFIG.MAX_REPEAT_FAILURES_PER_TASK)
         .sort((a, b) => {
             const failDiff = countTaskFailures(memory, a) - countTaskFailures(memory, b);
             if (failDiff !== 0) return failDiff;
+
+            const aHot = (a.files || []).filter((file) => hotFiles.has(file)).length;
+            const bHot = (b.files || []).filter((file) => hotFiles.has(file)).length;
+            if (aHot !== bHot) return bHot - aHot;
+
             return scoreTask(b) - scoreTask(a);
         });
 
@@ -1640,13 +1797,13 @@ async function trySelfHeal({ blueprint, task, implementation, checks, memory }) 
                 memory.metrics.selfHealSuccess++;
                 return {
                     ok: true,
-                    implementation: fixedImpl,
+                    implementation: mergeImplementations(currentImpl, fixedImpl),
                     checks: newChecks
                 };
             }
 
             failedSummary = summarizeVerificationResults(newChecks.verifyResults, newChecks.testResults) || failedSummary;
-            currentImpl = fixedImpl;
+            currentImpl = mergeImplementations(currentImpl, fixedImpl);
 
             log("⚠️ self-heal applied but ainda há erros; continuando a correção");
         } catch (err) {
@@ -1760,6 +1917,7 @@ async function main() {
                     });
 
                     rememberFailure(memory, task, reason);
+                    rememberFileFailures(memory, collectFailureFiles(task, reason, implementation), reason);
 
                     pushHistory(memory, {
                         type: "task_rejected",
@@ -1824,6 +1982,33 @@ async function main() {
                     });
 
                     rememberFailure(memory, task, failureReason);
+                    rememberFileFailures(memory, collectFailureFiles(task, failureReason, implementation), failureReason);
+
+                    const taskFailureCount = countTaskFailures(memory, task);
+                    if (taskFailureCount >= Math.max(2, Math.floor(CONFIG.MAX_REPEAT_FAILURES_PER_TASK / 2))) {
+                        try {
+                            const replannedTask = await replanTaskAfterFailures({
+                                blueprint,
+                                task,
+                                failureReason,
+                                memory
+                            });
+
+                            if (replannedTask) {
+                                removeTaskFromBacklog(memory, task.id);
+                                memory.backlog.unshift(replannedTask);
+                                pushHistory(memory, {
+                                    type: "task_replanned_after_checks_failure",
+                                    from: task.id,
+                                    to: replannedTask.id,
+                                    title: replannedTask.title
+                                });
+                                log("🔁 task replanned:", replannedTask.title);
+                            }
+                        } catch (replanErr) {
+                            debug("replan after checks failure error:", replanErr.message);
+                        }
+                    }
 
                     pushHistory(memory, {
                         type: "checks_failed",
@@ -1843,13 +2028,14 @@ async function main() {
                     task.commit_message ||
                     `chore: ${task.title}`;
 
-                const evolutionDocPath = updateMainEvolutionDoc({
+                const evolutionDocUpdate = updateMainEvolutionDoc({
                     task,
                     implementation,
                     review,
-                    commitMessage
+                    commitMessage,
+                    memory
                 });
-                log("📝 main document updated:", evolutionDocPath);
+                log("📝 main document updated:", evolutionDocUpdate.path);
 
                 const committed = commitAll(commitMessage);
 
@@ -1875,8 +2061,9 @@ async function main() {
                     goal: task.goal,
                     commit_message: commitMessage,
                     signature: stableTaskSignature(task),
-                    evolution_doc: evolutionDocPath,
-                    implementation_summary: sanitizeOneLine(implementation.summary || "completed")
+                    evolution_doc: evolutionDocUpdate.path,
+                    implementation_summary: sanitizeOneLine(implementation.summary || "completed"),
+                    next_opportunities: evolutionDocUpdate.nextOpportunities
                 });
 
                 rememberSuccess(memory, task, commitMessage);
@@ -1889,7 +2076,8 @@ async function main() {
                     id: task.id,
                     title: task.title,
                     commit: commitMessage,
-                    evolution_doc: evolutionDocPath
+                    evolution_doc: evolutionDocUpdate.path,
+                    next_opportunities: evolutionDocUpdate.nextOpportunities
                 });
 
                 saveMemory(memory);
@@ -1906,7 +2094,36 @@ async function main() {
                         signature: stableTaskSignature(task),
                         error_signature: stableTextSignature(err.message || String(err))
                     });
-                    rememberFailure(memory, task, err.message || String(err));
+                    const fatalReason = err.message || String(err);
+                    rememberFailure(memory, task, fatalReason);
+                    rememberFileFailures(memory, collectFailureFiles(task, fatalReason), fatalReason);
+
+                    const taskFailureCount = countTaskFailures(memory, task);
+                    if (taskFailureCount >= Math.max(2, Math.floor(CONFIG.MAX_REPEAT_FAILURES_PER_TASK / 2))) {
+                        try {
+                            const replannedTask = await replanTaskAfterFailures({
+                                blueprint,
+                                task,
+                                failureReason: fatalReason,
+                                memory
+                            });
+
+                            if (replannedTask) {
+                                removeTaskFromBacklog(memory, task.id);
+                                memory.backlog.unshift(replannedTask);
+                                pushHistory(memory, {
+                                    type: "task_replanned_after_fatal_error",
+                                    from: task.id,
+                                    to: replannedTask.id,
+                                    title: replannedTask.title
+                                });
+                                log("🔁 task replanned after fatal error:", replannedTask.title);
+                            }
+                        } catch (replanErr) {
+                            debug("replan after fatal error:", replanErr.message);
+                        }
+                    }
+
                     log("🔁 keeping task for retry");
                 } else {
                     memory.failed.unshift({
