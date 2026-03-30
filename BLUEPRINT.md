@@ -1,52 +1,147 @@
-# OmniFlow - Autonomous Evolution Blueprint
+# OmniFlow - Foundational Blueprint
 
-> Este documento é a FONTE DE VERDADE absoluta para o agente autônomo.
-> Toda decisão deve respeitar este blueprint.
-
----
-
-# 🎯 MISSÃO DO SISTEMA
-
-OmniFlow é um SaaS de automação de atendimento + CRM omnichannel com foco em:
-
-- geração e gestão de leads
-- automação de atendimento
-- workflows inteligentes
-- integração com APIs externas
+> Este documento define a base inicial do sistema.
+> Ele deve ser tratado como a referência principal para evolução técnica e funcional do projeto.
 
 ---
 
-# 🧠 OBJETIVO DO AGENTE
+# 1. VISÃO DO PRODUTO
 
-O agente deve:
+OmniFlow é uma plataforma SaaS para centralizar atendimento, organizar leads e automatizar processos de comunicação.
 
-1. Evoluir o sistema continuamente
-2. Melhorar código existente (prioridade máxima)
-3. Corrigir bugs
-4. Aumentar performance
-5. Aumentar segurança
-6. Melhorar DX (developer experience)
-7. Criar features APENAS quando alinhadas ao MVP
+O sistema deve permitir que empresas:
 
----
-
-# 🚫 REGRAS ABSOLUTAS (NÃO VIOLAR)
-
-- ❌ NÃO criar novos frameworks
-- ❌ NÃO introduzir tecnologias não presentes
-- ❌ NÃO usar:
-  - Firebase
-  - MongoDB
-  - Express puro
-  - GraphQL
-- ❌ NÃO alterar arquitetura base
-- ❌ NÃO modificar arquivos do agente
-- ❌ NÃO gerar código genérico sem contexto real
-- ❌ NÃO quebrar build/test/lint
+- recebam mensagens de múltiplos canais
+- organizem contatos e oportunidades
+- automatizem fluxos de atendimento
+- acompanhem o ciclo comercial
+- integrem serviços externos de forma segura
 
 ---
 
-# 🧱 STACK REAL (OBRIGATÓRIO)
+# 2. OBJETIVO DO SISTEMA
+
+O objetivo do OmniFlow é oferecer uma base única para operação comercial e atendimento, reunindo:
+
+- inbox omnichannel
+- CRM de leads e negócios
+- automações baseadas em eventos
+- integrações com serviços externos
+- suporte a respostas automáticas e assistidas por IA
+
+---
+
+# 3. OBJETIVO DO AGENTE AUTÔNOMO
+
+O agente deve atuar como evoluidor técnico do projeto.
+
+Responsabilidades:
+
+1. manter o sistema saudável
+2. corrigir bugs
+3. melhorar código existente
+4. reduzir débito técnico
+5. aumentar segurança
+6. melhorar performance
+7. melhorar testabilidade
+8. implementar pequenas evoluções alinhadas ao produto
+
+O agente não deve agir como inventor de produto fora do escopo.
+Ele deve priorizar consistência, segurança e incrementalismo.
+
+---
+
+# 4. PRINCÍPIOS GERAIS
+
+## 4.1 Simplicidade
+Toda solução deve ser a mais simples possível dentro da arquitetura adotada.
+
+## 4.2 Evolução incremental
+Mudanças devem ser pequenas, isoladas e reversíveis.
+
+## 4.3 Segurança primeiro
+Toda entrada deve ser validada.
+Todo erro deve ser tratado.
+Nenhum dado sensível deve ser exposto.
+
+## 4.4 Coerência arquitetural
+O sistema deve seguir um padrão claro de separação de responsabilidades.
+
+## 4.5 Manutenibilidade
+O código deve ser legível, tipado, previsível e fácil de alterar.
+
+---
+
+# 5. ESCOPO INICIAL DO PRODUTO
+
+## 5.1 Inbox
+Central de mensagens e conversas.
+
+Capacidades esperadas:
+- listar conversas
+- visualizar mensagens
+- enviar respostas
+- identificar origem do canal
+- registrar histórico
+
+## 5.2 CRM
+Gestão de leads e oportunidades.
+
+Capacidades esperadas:
+- cadastro de leads
+- movimentação em pipeline
+- atualização de status
+- associação com conversas
+- registro de interações
+
+## 5.3 Workflows
+Automação baseada em eventos e regras.
+
+Capacidades esperadas:
+- gatilhos
+- condições
+- ações
+- execução encadeada
+- reprocessamento seguro
+
+## 5.4 Integrações
+Conexão com canais e serviços externos.
+
+Capacidades esperadas:
+- autenticação com provedores
+- sincronização de dados
+- recebimento de webhooks
+- tratamento de falhas
+- rastreabilidade
+
+## 5.5 IA Assistiva
+Recursos opcionais de apoio ao atendimento.
+
+Capacidades esperadas:
+- sugerir respostas
+- classificar mensagens
+- resumir contexto
+- apoiar automações específicas
+
+---
+
+# 6. PRIORIDADES DO MVP
+
+A ordem de construção e evolução deve ser:
+
+1. autenticação e controle de acesso
+2. inbox
+3. integrações de comunicação
+4. CRM
+5. workflows
+6. recursos assistidos por IA
+7. relatórios operacionais
+
+---
+
+# 7. STACK BASE
+
+A stack obrigatória do projeto é:
 
 - Node.js
 - TypeScript
@@ -56,195 +151,291 @@ O agente deve:
 
 ---
 
-# 🏗️ ARQUITETURA OBRIGATÓRIA
+# 8. DIRETRIZES DE ARQUITETURA
 
-- Controllers → Services → Repositories
+A arquitetura deve seguir o fluxo:
 
-REGRAS:
+Controller → Service → Repository
 
-- Controller:
-  - apenas entrada/validação
-- Service:
-  - regra de negócio
-- Repository:
-  - acesso ao banco
+## 8.1 Controller
+Responsável por:
+- receber requisição
+- validar entrada
+- chamar service
+- retornar resposta
 
-❌ PROIBIDO:
-- lógica no controller
-- query direta fora do repository
+Não deve conter:
+- regra de negócio
+- query SQL
+- transformação complexa
+- lógica de integração
+
+## 8.2 Service
+Responsável por:
+- regra de negócio
+- orquestração
+- validações complementares
+- chamadas a repositories e integrações
+
+Não deve conter:
+- detalhes de transporte HTTP
+- acesso direto a banco fora dos repositories
+
+## 8.3 Repository
+Responsável por:
+- persistência
+- queries
+- paginação
+- filtros
+- otimização de acesso a dados
+
+Não deve conter:
+- regra de negócio de alto nível
+- lógica de controller
 
 ---
 
-# 📦 PADRÕES DE CÓDIGO
+# 9. PADRÕES DE CÓDIGO
 
-- DTO obrigatório
-- validação com class-validator
-- tipagem forte (NUNCA usar any)
-- funções pequenas
+Todo código novo deve seguir estas regras:
+
+- TypeScript com tipagem explícita
+- evitar `any`
+- DTO para entrada e saída quando aplicável
+- validação com `class-validator`
+- funções pequenas e claras
 - nomes descritivos
+- baixo acoplamento
 - evitar duplicação
+- tratamento explícito de erro
 
 ---
 
-# 🔐 SEGURANÇA (PRIORIDADE ALTA)
+# 10. MODELAGEM INICIAL DE DOMÍNIO
 
-Sempre priorizar:
+## 10.1 Usuários
+Representam operadores e administradores da plataforma.
 
-- validação de entrada
-- sanitização
-- tratamento de erro
-- não expor dados sensíveis
-- criptografia para credenciais
+## 10.2 Contatos
+Representam pessoas ou empresas que interagem com o sistema.
+
+## 10.3 Conversas
+Agrupam interações por canal e contato.
+
+## 10.4 Mensagens
+Unidade básica de comunicação.
+
+## 10.5 Leads
+Representam oportunidades comerciais em estágio inicial.
+
+## 10.6 Deals
+Representam negociações vinculadas a pipeline.
+
+## 10.7 Pipelines
+Representam etapas comerciais.
+
+## 10.8 Workflows
+Representam automações configuráveis.
+
+## 10.9 Integrações
+Representam conexões com provedores externos.
 
 ---
 
-# ⚡ PERFORMANCE
+# 11. REQUISITOS DE SEGURANÇA
 
-Focar em:
+O sistema deve sempre:
 
-- reduzir queries desnecessárias
-- evitar loops pesados
-- usar paginação
+- validar toda entrada
+- sanitizar dados externos
+- proteger credenciais
+- evitar exposição de tokens e segredos
+- usar hashing/criptografia quando necessário
+- registrar falhas sem vazar dados sensíveis
+- tratar permissões por perfil
+- negar por padrão o que não for explicitamente permitido
+
+---
+
+# 12. REQUISITOS DE PERFORMANCE
+
+O sistema deve priorizar:
+
+- paginação em listagens
+- filtros eficientes
 - evitar N+1 queries
+- evitar carregamento desnecessário
+- reduzir duplicidade de consultas
+- uso consciente de relações
+- processamento assíncrono quando apropriado
 
 ---
 
-# 🧪 TESTES
+# 13. REQUISITOS DE QUALIDADE
 
-- criar testes quando relevante
-- não quebrar testes existentes
-- preferir testes unitários
+Toda evolução deve buscar:
 
----
-
-# 📊 DOMÍNIOS DO SISTEMA
-
-## CRM
-- pipelines
-- deals
-- leads
-
-## Comunicação
-- mensagens
-- conversas
-- inbox
-
-## Workflows
-- execução de fluxos
-- triggers
-- ações
-
-## Integrações
-- WhatsApp
-- Email
-- APIs externas
+- build funcionando
+- lint limpo
+- testes passando
+- baixo risco de regressão
+- alteração pequena e validável
 
 ---
 
-# 🧩 WORKFLOW ENGINE
+# 14. TESTES
 
-- baseado em JSON
-- execução recursiva
-- nodes:
-  - trigger
-  - condition
-  - action
-  - ai
+Estratégia inicial:
 
----
+- priorizar testes unitários
+- criar testes para regras críticas
+- cobrir services antes de camadas menos críticas
+- adicionar testes ao corrigir bugs relevantes
 
-# 🤖 CHATBOT
-
-- modo menu (determinístico)
-- modo AI (LLM)
-- fallback humano
+Sempre que possível:
+- um bug corrigido deve virar um teste
+- uma regra importante deve ter cobertura mínima
 
 ---
 
-# 🚀 MVP PRIORIDADES (ORDEM)
+# 15. OBSERVABILIDADE
 
-1. Inbox (core)
-2. Integrações (WhatsApp / Email)
-3. Pipeline (CRM)
-4. Workflows
-5. AI responder
+O sistema deve produzir logs úteis para operação.
 
----
-
-# 🧨 PROBLEMAS ATUAIS (ATUALIZAR SEMPRE)
-
-- bugs de integração
-- performance em queries
-- falta de validação
-- ausência de testes
+Logs devem:
+- ajudar diagnóstico
+- registrar contexto técnico
+- evitar dados sensíveis
+- permitir rastrear falhas de integração
+- ajudar análise de workflows
 
 ---
 
-# 🎯 ÁREAS PRIORITÁRIAS
+# 16. INTEGRAÇÕES EXTERNAS
 
-- auth
-- integrations
-- reports
-- segurança
+Toda integração deve seguir regras mínimas:
 
----
-
-# 🧠 REGRAS DE DECISÃO DO AGENTE
-
-Antes de qualquer mudança, o agente deve perguntar:
-
-1. Isso melhora algo existente?
-2. Isso respeita a stack?
-3. Isso está no MVP?
-4. Isso é seguro?
-5. Isso é pequeno e incremental?
-
-Se qualquer resposta for NÃO → REJEITAR
+- client isolado
+- tratamento de timeout
+- tratamento de erro
+- retries apenas quando fizer sentido
+- logs rastreáveis
+- validação de payloads recebidos
+- adaptação clara entre modelo externo e interno
 
 ---
 
-# 🔄 ESTRATÉGIA DE EVOLUÇÃO
+# 17. WORKFLOW ENGINE
 
-O agente deve SEMPRE:
+A engine deve ser orientada por configuração estruturada.
 
-1. Preferir refatorar ao invés de criar
-2. Trabalhar em pequenas melhorias
-3. Evitar mudanças grandes
-4. Garantir que o sistema continua funcionando
+Modelo inicial:
+- trigger
+- condition
+- action
+- ai
 
----
-
-# 🧠 APRENDIZADO CONTÍNUO
-
-O agente deve:
-
-- evitar repetir erros
-- evitar tarefas já feitas
-- aprender com falhas de lint/test
-- melhorar commits ao longo do tempo
+Requisitos:
+- execução previsível
+- suporte a encadeamento
+- tratamento de falhas por etapa
+- logs por execução
+- evitar loops infinitos
+- validar estrutura do fluxo antes de executar
 
 ---
 
-# 📌 DEFINIÇÃO DE TAREFA VÁLIDA
+# 18. DIRETRIZES PARA IA
 
-Uma tarefa deve:
+Recursos de IA são complementares, não centrais no início.
 
+A IA pode ser usada para:
+- sugerir respostas
+- classificar intenção
+- resumir conversas
+- apoiar automações
+
+A IA não deve:
+- substituir validações determinísticas
+- decidir ações críticas sem controle
+- operar sem logs e rastreabilidade
+
+---
+
+# 19. REGRAS DE EVOLUÇÃO DO AGENTE
+
+Antes de qualquer mudança, o agente deve validar:
+
+1. isso resolve um problema real?
+2. isso melhora algo existente?
+3. isso respeita a stack?
+4. isso respeita a arquitetura?
+5. isso é pequeno e incremental?
+6. isso é seguro?
+7. isso é testável?
+8. isso preserva build/lint/test?
+
+Se qualquer resposta for negativa, a mudança deve ser rejeitada, reduzida ou refeita.
+
+---
+
+# 20. O QUE O AGENTE DEVE PRIORIZAR
+
+Ordem de prioridade:
+
+1. corrigir bugs
+2. melhorar validação e segurança
+3. reduzir complexidade
+4. melhorar performance
+5. aumentar cobertura de testes
+6. refatorar trechos ruins
+7. implementar evoluções pequenas do MVP
+
+---
+
+# 21. O QUE O AGENTE NÃO DEVE FAZER
+
+O agente não deve:
+
+- inventar features grandes sem base real
+- alterar arquitetura sem necessidade
+- adicionar tecnologia nova fora da stack
+- misturar responsabilidades entre camadas
+- editar seus próprios arquivos
+- gerar código sem contexto do projeto
+- manter mudanças que quebrem build/test/lint
+- insistir em tarefa que falhou repetidamente sem evidência de solução
+
+---
+
+# 22. CRITÉRIOS DE TAREFA VÁLIDA
+
+Uma tarefa só é válida se:
+
+- tiver impacto claro
 - afetar poucos arquivos
-- ter impacto claro
-- ser testável
-- não quebrar o sistema
+- for pequena o bastante para revisar
+- puder ser validada
+- não colocar o sistema em risco
+- estiver alinhada ao MVP ou à saúde do projeto
 
 ---
 
-# 🛑 QUANDO PARAR UMA TAREFA
+# 23. CRITÉRIOS DE ABANDONO
 
-- se falhar 2x → abandonar
-- se quebrar build → rollback
-- se não fizer sentido → descartar
+Uma tarefa deve ser abandonada, revertida ou adiada quando:
+
+- falhar repetidamente
+- introduzir regressão
+- quebrar build
+- sair do escopo do MVP
+- exigir mudança estrutural maior do que o benefício justifica
 
 ---
 
-# 🧾 COMMIT PADRÃO
+# 24. PADRÃO DE COMMITS
+
+Tipos permitidos:
 
 - feat:
 - fix:
@@ -252,12 +443,39 @@ Uma tarefa deve:
 - chore:
 - test:
 
+Commits devem ser:
+- pequenos
+- claros
+- coerentes com a alteração
+- fáceis de rastrear
+
 ---
 
-# 🔚 REGRA FINAL
+# 25. ESTADO INICIAL DOS PROBLEMAS
 
-Se houver dúvida:
+Enquanto não houver diagnóstico real do projeto, assumir como riscos iniciais:
 
-👉 NÃO INVENTAR  
-👉 NÃO EXPANDIR  
-👉 MELHORAR O QUE JÁ EXISTE
+- falta de validação de entrada
+- tratamento inconsistente de erro
+- baixa cobertura de testes
+- queries ineficientes
+- acoplamento excessivo em alguns fluxos
+- integrações frágeis
+- logs insuficientes
+
+Esses itens devem ser confirmados ou descartados pelo agente com base no código real.
+
+---
+
+# 26. REGRA FINAL
+
+Na dúvida, o agente deve:
+
+- não inventar
+- não expandir desnecessariamente
+- não reescrever sem motivo
+- preferir corrigir e melhorar o que já existe
+- preservar a coerência do sistema
+
+Objetivo final:
+evoluir o OmniFlow com segurança, consistência e melhorias contínuas reais.
