@@ -28,7 +28,7 @@ const CONFIG = {
     REMOTE_NAME: process.env.REMOTE_NAME || "origin",
     AUTO_PUSH: String(process.env.AUTO_PUSH || "true").toLowerCase() === "true",
     AUTO_BRANCH: String(process.env.AUTO_BRANCH || "true").toLowerCase() === "true",
-    BRANCH_PREFIX: process.env.BRANCH_PREFIX || "agent/autonomous",
+    BRANCH_PREFIX: process.env.BRANCH_PREFIX || "agent/autonomous/test",
 
     MAX_ITERATIONS: Number(process.env.MAX_ITERATIONS || 999999999),
     LOOP_DELAY_MS: Number(process.env.LOOP_DELAY_MS || 5000),
