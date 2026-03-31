@@ -482,6 +482,23 @@ evoluir o OmniFlow com segurança, consistência e melhorias contínuas reais.
 
 ## Auto Evolution Log
 
+### 2026-03-31T13:14:49.015Z | Improve developer experience around changed modules
+- category: dx
+- priority: low
+- goal: Enhance the development environment to make changes more seamless and efficient.
+- commit: refactor: update tsconfig.json and package.json for improved developer experience
+- files changed: tsconfig.json, package.json
+- files deleted: none
+- implementation summary: Updated tsconfig.json to include declaration files and updated package.json to include dependencies for unit testing and ESLint.
+- review reason: The changes match the task, improve developer experience around changed files, and are generally safe and acceptable.
+- notes:
+- Updated tsconfig.json to include declaration files and updated package.json to include dependencies for unit testing and ESLint.
+- warnings:
+- none
+- next opportunities:
+- Add or expand automated tests for: tsconfig.json, package.json
+- Monitor regressions after Improve developer experience around changed modules and harden validation where needed
+
 ### 2026-03-31T13:12:24.186Z | Optimize ESLint configuration
 - category: performance
 - priority: medium
